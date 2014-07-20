@@ -1,6 +1,6 @@
 #!/usr/bin/env ocamlscript
 Ocaml.sources := ["common.ml"];
-Ocaml.packs := ["xcp.storage"];
+Ocaml.packs := ["xcp.storage"; "cmdliner"];
 Ocaml.ocamlflags := ["-thread"]
 --
 (*
@@ -17,4 +17,53 @@ Ocaml.ocamlflags := ["-thread"]
  * GNU Lesser General Public License for more details.
  *)
 
-exit (-1) (* not implemented *)
+let version = "1.0.0"
+let project_url = "https://github.com/xapi-project/ezlvm"
+
+module Common = struct
+  type t = {
+    verbose: bool;
+    debug: bool;
+  }
+  (** options common to all subcommands *)
+
+  let make verbose debug = { verbose; debug }
+end
+
+let attach common =
+  `Ok ()
+
+(* Command-line parsing *)
+open Cmdliner
+
+let _common_options = "COMMON OPTIONS"
+
+let common_options_t =
+  let docs = _common_options in
+  let debug =
+    let doc = "Give only debug output." in
+    Arg.(value & flag & info ["debug"] ~docs ~doc) in
+  let verb =
+    let doc = "Give verbose output." in
+    let verbose = true, Arg.info ["v"; "verbose"] ~docs ~doc in
+    Arg.(last & vflag_all [false] [verbose]) in
+  Term.(pure Common.make $ debug $ verb)
+
+let help = [
+ `S _common_options;
+ `P "These options are common to all commands.";
+ `S "MORE HELP";
+ `P "Use `$(mname) $(i,COMMAND) --help' for help on a single command."; `Noblank;
+ `S "BUGS"; `P (Printf.sprintf "Check bug reports at %s" project_url);
+]
+
+let cmd =
+  let doc = "attach a virtual disk" in
+  let man = help in
+  Term.(ret (pure attach $ common_options_t)),
+  Term.info Sys.argv.(0) ~version ~sdocs:_common_options ~doc ~man
+
+let _ =
+  match Term.eval cmd with
+  | `Error _ -> exit 1
+  | _ -> exit 0
