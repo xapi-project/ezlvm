@@ -15,7 +15,7 @@ sudo apt-get update -qq
 sudo apt-get install -qq ocaml ocaml-native-compilers camlp4-extra opam
 
 export OPAMYES=1
-export OPAMVERBOSE=1
+#export OPAMVERBOSE=1
 echo OCaml version
 ocaml -version
 echo OPAM versions
@@ -23,10 +23,18 @@ opam --version
 opam --git-version
 
 opam init
+# ocamlscript doesn't read .ocamlinit so the ocamlfind opam workaround breaks.
+# This is a workaround workaround:
+opam install ocamlfind
+sudo mkdir -p $(ocamlc -where)
+eval `opam config env`
+sudo cp $OCAML_TOPLEVEL_PATH/topfind $(ocamlc -where)
+
 opam remote add xapi git://github.com/xapi-project/opam-repo-dev
 depext=`opam install -e ubuntu $OPAM_DEPENDS`
 sudo apt-get install -qq $depext
 opam install ${OPAM_DEPENDS}
 eval `opam config env`
 make
+echo Running make test
 make test
