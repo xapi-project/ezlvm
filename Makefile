@@ -8,5 +8,5 @@ clean:
 test:
 	# Running the commands will invoke the typechecker
 	for command in $(COMMANDS); do \
-		./$$command --help ; \
+		./$$command --help plain ; \
 	done
