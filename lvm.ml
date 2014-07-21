@@ -107,5 +107,5 @@ let run args = match !test_devices with
 
 let make_temp_volume () =
   let path = Filename.temp_file Sys.argv.(0) "volume" in
-  ignore_string (Common.run "dd" [ "if=/dev/zero"; "of=" ^ path; "seek=1024"; "bs=1M" ]);
+  ignore_string (Common.run "dd" [ "if=/dev/zero"; "of=" ^ path; "seek=1024"; "bs=1M"; "count=1"]);
   path
