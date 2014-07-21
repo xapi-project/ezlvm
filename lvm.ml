@@ -48,3 +48,7 @@ let vgcreate vg_name = function
     ignore_string (run "vgcreate" [ vg_name; d ]);
     List.iter (fun dev -> ignore_string (run "vgextend" [ vg_name; dev ])) ds;
     ignore_string (run "vgchange" [ "-an"; vg_name ])
+
+let lvcreate vg_name lv_name bytes =
+  let size_mb = Int64.to_string (Int64.div (Int64.add 1048575L bytes) (1048576L)) in
+  ignore_string (Common.run "lvcreate" [ "-L"; size_mb; "-n"; lv_name; "vg_name"; "-Z"; "n" ])
