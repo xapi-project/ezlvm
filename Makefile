@@ -1,4 +1,4 @@
-COMMANDS=SR.create SR.scan VDI.create VDI.destroy VDI.attach VDI.detach SR.destroy VDI.resize
+COMMANDS=SR.create SR.scan VDI.create VDI.destroy VDI.attach VDI.detach SR.destroy VDI.resize SR.attach
 
 .PHONY: clean
 clean:
