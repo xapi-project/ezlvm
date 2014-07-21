@@ -22,8 +22,15 @@ let ignore_string (_: string) = ()
 
 open Xcp_service
 
-module D = Debug.Make(struct let name = "ffs" end)
-include D
+let log fmt =
+  Printf.ksprintf
+    (fun s ->
+      output_string stderr s;
+      output_string stderr "\n";
+      ) fmt
+let debug fmt = log fmt
+let warn fmt = debug fmt
+let error fmt = debug fmt
 
 type t = {
   verbose: bool;
@@ -32,7 +39,8 @@ type t = {
 }
 (** options common to all subcommands *)
 
-let make verbose debug test = { verbose; debug; test }
+let make verbose debug test =
+  { verbose; debug; test }
 
 let finally f g =
   try
@@ -124,8 +132,34 @@ let retry_every n f =
       Thread.delay n
   done
 
+(* From Xcp_service: *)
+let colon = Re_str.regexp_string ":"
+
+let canonicalise x =
+  if not(Filename.is_relative x)
+  then x
+  else begin
+    (* Search the PATH and XCP_PATH for the executable *)
+    let paths = Re_str.split colon (Sys.getenv "PATH") in
+    let xen_paths = try Re_str.split colon (Sys.getenv "XCP_PATH") with _ -> [] in
+    let first_hit = List.fold_left (fun found path -> match found with
+      | Some hit -> found
+      | None ->
+        let possibility = Filename.concat path x in
+        if Sys.file_exists possibility
+        then Some possibility
+        else None
+    ) None (paths @ xen_paths) in
+    match first_hit with
+    | None ->
+      warn "Failed to find %s on $PATH ( = %s) or $XCP_PATH ( = %s)" x (Sys.getenv "PATH") (try Sys.getenv "XCP_PATH" with Not_found -> "unset");
+      x
+    | Some hit -> hit
+  end
+
 let run ?(env= [| |]) cmd args =
-  debug "exec %s %s" cmd (String.concat " " args);
+  let cmd = canonicalise cmd in
+  debug "%s %s" cmd (String.concat " " args);
   let null = Unix.openfile "/dev/null" [ Unix.O_RDWR ] 0 in
   let to_close = ref [ null ] in
   let close fd =

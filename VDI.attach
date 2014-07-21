@@ -1,6 +1,6 @@
 #!/usr/bin/env ocamlscript
 Ocaml.sources := ["common.ml"];
-Ocaml.packs := ["xcp.storage"; "cmdliner"];
+Ocaml.packs := ["xcp.storage"; "cmdliner"; "re.str"];
 Ocaml.ocamlflags := ["-thread"]
 --
 (*

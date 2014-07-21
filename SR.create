@@ -1,6 +1,6 @@
 #!/usr/bin/env ocamlscript
 Ocaml.sources := ["common.ml"; "lvm.ml"];
-Ocaml.packs := ["xcp.storage"; "oUnit"; "cmdliner"];
+Ocaml.packs := ["xcp.storage"; "oUnit"; "cmdliner"; "re.str"];
 Ocaml.ocamlflags := ["-thread"]
 --
 (*
@@ -39,7 +39,7 @@ open OUnit
 let test_vgcreate () =
   let tmp = Lvm.make_temp_volume () in
   create_vg "hello" [ tmp ];
-  rm_f tmp
+  Lvm.remove_temp_volume tmp
 
 let test common =
   let suite = "create" >::: [
