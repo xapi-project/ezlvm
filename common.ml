@@ -27,6 +27,7 @@ let log fmt =
     (fun s ->
       output_string stderr s;
       output_string stderr "\n";
+      flush stderr;
       ) fmt
 let debug fmt = log fmt
 let warn fmt = debug fmt
