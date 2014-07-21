@@ -39,7 +39,7 @@ let test common =
   ] in
   ignore(run_test_tt ~verbose:common.Common.verbose suite)
 
-let create common =
+let command common =
   if common.Common.test then test common;
   `Ok ()
 
@@ -49,7 +49,7 @@ open Cmdliner
 let cmd =
   let doc = "create a virtual disk (VDI)" in
   let man = help in
-  Term.(ret (pure create $ common_options_t)),
+  Term.(ret (pure command $ common_options_t)),
   Term.info Sys.argv.(0) ~version:version ~sdocs:_common_options ~doc ~man
 
 let _ =
