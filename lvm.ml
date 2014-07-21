@@ -51,4 +51,29 @@ let vgcreate vg_name = function
 
 let lvcreate vg_name lv_name bytes =
   let size_mb = Int64.to_string (Int64.div (Int64.add 1048575L bytes) (1048576L)) in
-  ignore_string (Common.run "lvcreate" [ "-L"; size_mb; "-n"; lv_name; "vg_name"; "-Z"; "n" ])
+  ignore_string (Common.run "lvcreate" [ "-L"; size_mb; "-n"; lv_name; vg_name; "-Z"; "n" ])
+
+let lvremove vg_name lv_name =
+  ignore_string(Common.run "lvremove" [ "-f"; Printf.sprintf "%s/%s" vg_name lv_name])
+
+type lv = {
+  name: string;
+  tags: string list;
+}
+
+let newline = Re_str.regexp_string "\n"
+let whitespace = Re_str.regexp "[\n\r\t ]+"
+let comma = Re_str.regexp_string ","
+
+let lvs vg_name =
+  let output = Common.run "lvs" [ "-o"; "lv_name,tags"; "--noheadings"; vg_name ] in
+  let lines = List.filter (fun x -> x <> "") (Re_str.split_delim newline output) in
+  List.map
+    (fun line ->
+      match List.filter (fun x -> x <> "") (Re_str.split_delim whitespace line) with
+      | [ x; y ] -> { name = x; tags = Re_str.split_delim comma y }
+      | [ x ] -> { name = x; tags = [] }
+      | _ ->
+        debug "Couldn't parse the LV name/ list of tags: [%s]" line;
+        failwith (Printf.sprintf "Couldn't parse the LV name/ list of tags: [%s]" line)
+    ) lines
