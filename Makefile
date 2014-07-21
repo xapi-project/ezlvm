@@ -1,4 +1,4 @@
-COMMANDS=VDI.attach
+COMMANDS=SR.create  SR.scan VDI.create  VDI.destroy
 
 .PHONY: clean
 clean:
@@ -8,5 +8,6 @@ clean:
 test:
 	# Running the commands will invoke the typechecker
 	for command in $(COMMANDS); do \
-		./$$command --help plain ; \
+	        echo $$command ; \
+		./$$command --test ; \
 	done
