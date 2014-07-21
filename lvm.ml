@@ -77,3 +77,5 @@ let lvs vg_name =
         debug "Couldn't parse the LV name/ list of tags: [%s]" line;
         failwith (Printf.sprintf "Couldn't parse the LV name/ list of tags: [%s]" line)
     ) lines
+
+let device vg_name vol_name = Printf.sprintf "/dev/%s/%s" vg_name vol_name

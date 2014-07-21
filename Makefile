@@ -1,4 +1,4 @@
-COMMANDS=SR.create  SR.scan VDI.create  VDI.destroy
+COMMANDS=SR.create SR.scan VDI.create VDI.destroy VDI.attach
 
 .PHONY: clean
 clean:
