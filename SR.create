@@ -19,26 +19,11 @@ Ocaml.ocamlflags := ["-thread"]
 
 open Common
 
-let create_vg vg_name = function
-  | [] -> failwith "I need at least 1 physical device to create a volume group"
-  | d :: ds as devices ->
-    List.iter
-      (fun dev ->
-        (* First destroy anything already on the device *)
-        ignore_string (run "dd" [ "if=/dev/zero"; "of=" ^ dev; "bs=512"; "count=4" ]);
-        ignore_string (run "pvcreate" [ "--metadatasize"; "10M"; dev ])
-      ) devices;
-
-    (* Create the VG on the first device *)
-    ignore_string (run "vgcreate" [ vg_name; d ]);
-    List.iter (fun dev -> ignore_string (run "vgextend" [ vg_name; dev ])) ds;
-    ignore_string (run "vgchange" [ "-an"; vg_name ])
-
 open OUnit
 
 let test_vgcreate () =
   let tmp = Lvm.make_temp_volume () in
-  create_vg "hello" [ tmp ];
+  Lvm.vgcreate "hello" [ tmp ];
   Lvm.remove_temp_volume tmp
 
 let test common =
