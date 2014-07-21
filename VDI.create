@@ -28,6 +28,7 @@ let test_lvcreate () =
     (fun () ->
       Lvm.vgcreate vg_name [ vol ];
       Lvm.lvcreate vg_name "testvol" 1L;
+      Lvm.lvremove vg_name "testvol";
     ) (fun () ->
       Lvm.remove_temp_volume vol
     )
