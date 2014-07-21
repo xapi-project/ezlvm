@@ -78,4 +78,26 @@ let lvs vg_name =
         failwith (Printf.sprintf "Couldn't parse the LV name/ list of tags: [%s]" line)
     ) lines
 
-let device vg_name vol_name = Printf.sprintf "/dev/%s/%s" vg_name vol_name
+let device vg_name lv_name = Printf.sprintf "/dev/%s/%s" vg_name lv_name
+
+let lvresize vg_name lv_name size =
+  let size_mb = Int64.div (Int64.add 1048575L size) (1048576L) in
+  (* Check it's not already the correct size *)
+  let out = Common.run "lvdisplay" [ vg_name ^ "/" ^ lv_name; "-C"; "-o"; "size"; "--noheadings"; "--units"; "m"] in
+  (* Returns something of the form: "   40.00M\n" *)
+  let cur_mb =
+    try
+      String.index out '.'
+      |> String.sub out 0               (* ignore the decimals *)
+      |> Re_str.split_delim whitespace
+      |> List.filter (fun x -> x <> "") (* get rid of whitespace *)
+      |> List.hd                        (* there should be only one thing ... *)
+      |> Int64.of_string                (* ... and it should be a number *)
+    with e ->
+      error "Couldn't parse the lvdisplay output: [%s]" out;
+      raise e in
+  let size_mb_rounded = Int64.mul 4L (Int64.div (Int64.add size_mb 3L) 4L) in
+  if cur_mb <> size_mb_rounded then begin
+    debug "lvresize: current size is %Ld MiB <> requested size %Ld MiB (rounded from %Ld); resizing" cur_mb size_mb_rounded size_mb;
+    ignore_string(Common.run ~stdin:"y\n" "lvresize" [ vg_name ^ "/" ^ lv_name; "-L"; Int64.to_string size_mb ])
+  end

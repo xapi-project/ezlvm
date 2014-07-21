@@ -158,7 +158,7 @@ let canonicalise x =
     | Some hit -> hit
   end
 
-let run ?(env= [| |]) cmd args =
+let run ?(env= [| |]) ?stdin cmd args =
   let cmd = canonicalise cmd in
   debug "%s %s" cmd (String.concat " " args);
   let null = Unix.openfile "/dev/null" [ Unix.O_RDWR ] 0 in
@@ -174,8 +174,22 @@ let run ?(env= [| |]) cmd args =
     let tmp = String.make 4096 '\000' in
     let readable, writable = Unix.pipe () in
     to_close := readable :: writable :: !to_close;
-    let pid = Unix.create_process_env cmd (Array.of_list (cmd :: args)) env null writable null in
+
+    let stdin_readable, stdin_writable = Unix.pipe () in
+    to_close := stdin_readable :: stdin_writable :: !to_close;
+
+    let pid = Unix.create_process_env cmd (Array.of_list (cmd :: args)) env stdin_readable writable Unix.stderr in
     close writable;
+    close stdin_readable;
+    (* assume 'stdin' is small such that this won't block *)
+    begin match stdin with
+    | None -> ()
+    | Some txt ->
+      let n = Unix.write stdin_writable txt 0 (String.length txt) in
+      if n <> (String.length txt)
+      then failwith (Printf.sprintf "short write to process stdin: only wrote %d bytes" n);
+    end;
+    close stdin_writable;
     let finished = ref false in
     while not !finished do
       let n = Unix.read readable tmp 0 (String.length tmp) in
