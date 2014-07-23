@@ -1,6 +1,6 @@
 #!/usr/bin/env ocamlscript
 Ocaml.sources := ["common.ml"; "lvm.ml"];
-Ocaml.packs := ["xcp.storage"; "cmdliner"; "re.str"; "oUnit"];
+Ocaml.packs := ["xcp.storage"; "oUnit"; "cmdliner"; "re.str"];
 Ocaml.ocamlflags := ["-thread"]
 --
 (*
@@ -16,28 +16,26 @@ Ocaml.ocamlflags := ["-thread"]
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Lesser General Public License for more details.
  *)
+
 open Common
 
 open OUnit
 
-let test_stat () =
+let test_lvcreate () =
   let vol = Lvm.make_temp_volume () in
   let vg_name = "hello" in
   finally
     (fun () ->
       Lvm.vgcreate vg_name [ vol ];
       Lvm.lvcreate vg_name "testvol" 1L;
-      finally
-        (fun () ->
-          ignore(Unix.stat (Lvm.device vg_name "testvol"))
-        ) (fun () -> Lvm.lvremove vg_name "testvol")
+      Lvm.lvremove vg_name "testvol";
     ) (fun () ->
       Lvm.remove_temp_volume vol
     )
 
 let test common =
-  let suite = "attach" >::: [
-    "stat" >:: test_stat;
+  let suite = "create" >::: [
+    "lvcreate" >:: test_lvcreate;
   ] in
   ignore(run_test_tt ~verbose:common.Common.verbose suite)
 
@@ -49,7 +47,7 @@ let command common =
 open Cmdliner
 
 let cmd =
-  let doc = "attach a virtual disk" in
+  let doc = "create a virtual disk (VDI)" in
   let man = help in
   Term.(ret (pure command $ common_options_t)),
   Term.info Sys.argv.(0) ~version:version ~sdocs:_common_options ~doc ~man

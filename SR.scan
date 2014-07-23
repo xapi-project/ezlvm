@@ -1,6 +1,6 @@
 #!/usr/bin/env ocamlscript
 Ocaml.sources := ["common.ml"; "lvm.ml"];
-Ocaml.packs := ["xcp.storage"; "cmdliner"; "re.str"; "oUnit"];
+Ocaml.packs := ["xcp.storage"; "oUnit"; "cmdliner"; "re.str"];
 Ocaml.ocamlflags := ["-thread"]
 --
 (*
@@ -16,11 +16,12 @@ Ocaml.ocamlflags := ["-thread"]
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Lesser General Public License for more details.
  *)
+
 open Common
 
 open OUnit
 
-let test_stat () =
+let test_lvs () =
   let vol = Lvm.make_temp_volume () in
   let vg_name = "hello" in
   finally
@@ -29,15 +30,20 @@ let test_stat () =
       Lvm.lvcreate vg_name "testvol" 1L;
       finally
         (fun () ->
-          ignore(Unix.stat (Lvm.device vg_name "testvol"))
-        ) (fun () -> Lvm.lvremove vg_name "testvol")
+          match Lvm.lvs vg_name with
+          | [ { Lvm.name = "testvol"; tags = [] } ] -> ()
+          | [ ] -> failwith "I created 'testvol' but it didnt show in 'lvs'"
+          | _ -> failwith "I created 'testvol' but multiple volumes showed up in 'lvs'"
+        ) (fun () ->
+          Lvm.lvremove vg_name "testvol"
+        )
     ) (fun () ->
       Lvm.remove_temp_volume vol
     )
 
 let test common =
-  let suite = "attach" >::: [
-    "stat" >:: test_stat;
+  let suite = "create" >::: [
+    "lvs" >:: test_lvs;
   ] in
   ignore(run_test_tt ~verbose:common.Common.verbose suite)
 
@@ -49,7 +55,7 @@ let command common =
 open Cmdliner
 
 let cmd =
-  let doc = "attach a virtual disk" in
+  let doc = "list the volumes within a storage repository" in
   let man = help in
   Term.(ret (pure command $ common_options_t)),
   Term.info Sys.argv.(0) ~version:version ~sdocs:_common_options ~doc ~man

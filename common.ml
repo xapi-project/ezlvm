@@ -12,13 +12,36 @@
  * GNU Lesser General Public License for more details.
  *)
 
+let version = "1.0.0"
+let project_url = "https://github.com/xapi-project/ezlvm"
+
 (* Utility functions common to all scripts.
    Perhaps these should be moved into the Xcp_service library? *)
 
+let ignore_string (_: string) = ()
+
 open Xcp_service
 
-module D = Debug.Make(struct let name = "ffs" end)
-include D
+let log fmt =
+  Printf.ksprintf
+    (fun s ->
+      output_string stderr s;
+      output_string stderr "\n";
+      flush stderr;
+      ) fmt
+let debug fmt = log fmt
+let warn fmt = debug fmt
+let error fmt = debug fmt
+
+type t = {
+  verbose: bool;
+  debug: bool;
+  test: bool;
+}
+(** options common to all subcommands *)
+
+let make verbose debug test =
+  { verbose; debug; test }
 
 let finally f g =
   try
@@ -67,7 +90,7 @@ let endswith suffix x =
   let x' = String.length x in
   x' >= suffix' && (String.sub x (x' - suffix') suffix' = suffix)
 
-let iso8601_of_float x = 
+let iso8601_of_float x =
   let time = Unix.gmtime x in
   Printf.sprintf "%04d%02d%02dT%02d:%02d:%02dZ"
     (time.Unix.tm_year+1900)
@@ -84,7 +107,7 @@ let mkdir_rec dir perm =
     try Unix.mkdir dir perm with Unix.Unix_error (Unix.EEXIST, _, _) -> () in
   let rec p_mkdir dir =
     let p_name = Filename.dirname dir in
-    if p_name <> "/" && p_name <> "." 
+    if p_name <> "/" && p_name <> "."
     then p_mkdir p_name;
     mkdir_safe dir perm in
   p_mkdir dir
@@ -110,8 +133,34 @@ let retry_every n f =
       Thread.delay n
   done
 
-let run cmd args =
-  debug "exec %s %s" cmd (String.concat " " args);
+(* From Xcp_service: *)
+let colon = Re_str.regexp_string ":"
+
+let canonicalise x =
+  if not(Filename.is_relative x)
+  then x
+  else begin
+    (* Search the PATH and XCP_PATH for the executable *)
+    let paths = Re_str.split colon (Sys.getenv "PATH") in
+    let xen_paths = try Re_str.split colon (Sys.getenv "XCP_PATH") with _ -> [] in
+    let first_hit = List.fold_left (fun found path -> match found with
+      | Some hit -> found
+      | None ->
+        let possibility = Filename.concat path x in
+        if Sys.file_exists possibility
+        then Some possibility
+        else None
+    ) None (paths @ xen_paths) in
+    match first_hit with
+    | None ->
+      warn "Failed to find %s on $PATH ( = %s) or $XCP_PATH ( = %s)" x (Sys.getenv "PATH") (try Sys.getenv "XCP_PATH" with Not_found -> "unset");
+      x
+    | Some hit -> hit
+  end
+
+let run ?(env= [| |]) ?stdin cmd args =
+  let cmd = canonicalise cmd in
+  debug "%s %s" cmd (String.concat " " args);
   let null = Unix.openfile "/dev/null" [ Unix.O_RDWR ] 0 in
   let to_close = ref [ null ] in
   let close fd =
@@ -125,8 +174,22 @@ let run cmd args =
     let tmp = String.make 4096 '\000' in
     let readable, writable = Unix.pipe () in
     to_close := readable :: writable :: !to_close;
-    let pid = Unix.create_process cmd (Array.of_list (cmd :: args)) null writable null in
+
+    let stdin_readable, stdin_writable = Unix.pipe () in
+    to_close := stdin_readable :: stdin_writable :: !to_close;
+
+    let pid = Unix.create_process_env cmd (Array.of_list (cmd :: args)) env stdin_readable writable Unix.stderr in
     close writable;
+    close stdin_readable;
+    (* assume 'stdin' is small such that this won't block *)
+    begin match stdin with
+    | None -> ()
+    | Some txt ->
+      let n = Unix.write stdin_writable txt 0 (String.length txt) in
+      if n <> (String.length txt)
+      then failwith (Printf.sprintf "short write to process stdin: only wrote %d bytes" n);
+    end;
+    close stdin_writable;
     let finished = ref false in
     while not !finished do
       let n = Unix.read readable tmp 0 (String.length tmp) in
@@ -144,3 +207,30 @@ let run cmd args =
   with e ->
     close_all ();
     raise e
+
+
+open Cmdliner
+
+let _common_options = "COMMON OPTIONS"
+
+let common_options_t =
+  let docs = _common_options in
+  let debug =
+    let doc = "Give only debug output." in
+    Arg.(value & flag & info ["debug"] ~docs ~doc) in
+  let verb =
+    let doc = "Give verbose output." in
+    let verbose = true, Arg.info ["v"; "verbose"] ~docs ~doc in
+    Arg.(last & vflag_all [false] [verbose]) in
+  let test =
+    let doc = "Perform self-tests." in
+    Arg.(value & flag & info ["test"] ~docs ~doc) in
+  Term.(pure make $ debug $ verb $ test)
+
+let help = [
+ `S _common_options;
+ `P "These options are common to all commands.";
+ `S "MORE HELP";
+ `P "Use `$(mname) $(i,COMMAND) --help' for help on a single command."; `Noblank;
+ `S "BUGS"; `P (Printf.sprintf "Check bug reports at %s" project_url);
+]
