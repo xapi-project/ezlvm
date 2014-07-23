@@ -65,10 +65,12 @@ let newline = Re_str.regexp_string "\n"
 let whitespace = Re_str.regexp "[\n\r\t ]+"
 let comma = Re_str.regexp_string ","
 
+let to_lines output = List.filter (fun x -> x <> "") (Re_str.split_delim newline output)
+
 let lvs vg_name =
-  let output = Common.run "lvs" [ "-o"; "lv_name,tags"; "--noheadings"; vg_name ] in
-  let lines = List.filter (fun x -> x <> "") (Re_str.split_delim newline output) in
-  List.map
+  Common.run "lvs" [ "-o"; "lv_name,tags"; "--noheadings"; vg_name ]
+  |> to_lines
+  |> List.map
     (fun line ->
       match List.filter (fun x -> x <> "") (Re_str.split_delim whitespace line) with
       | [ x; y ] -> { name = x; tags = Re_str.split_delim comma y }
@@ -76,7 +78,7 @@ let lvs vg_name =
       | _ ->
         debug "Couldn't parse the LV name/ list of tags: [%s]" line;
         failwith (Printf.sprintf "Couldn't parse the LV name/ list of tags: [%s]" line)
-    ) lines
+    )
 
 let device vg_name lv_name = Printf.sprintf "/dev/%s/%s" vg_name lv_name
 
@@ -101,3 +103,11 @@ let lvresize vg_name lv_name size =
     debug "lvresize: current size is %Ld MiB <> requested size %Ld MiB (rounded from %Ld); resizing" cur_mb size_mb_rounded size_mb;
     ignore_string(Common.run ~stdin:"y\n" "lvresize" [ vg_name ^ "/" ^ lv_name; "-L"; Int64.to_string size_mb ])
   end
+
+let vgs () =
+  Common.run "vgs" [ "-o"; "name"; "--noheadings" ]
+  |> to_lines
+  |> List.map
+    (fun line ->
+      List.hd (List.filter (fun x -> x <> "") (Re_str.split_delim whitespace line))
+    )
