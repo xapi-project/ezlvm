@@ -1,6 +1,6 @@
 #!/usr/bin/env ocamlscript
 Ocaml.sources := ["common.ml"; "lvm.ml"];
-Ocaml.packs := ["xcp.storage"; "cmdliner"; "re.str"; "oUnit"];
+Ocaml.packs := ["xapi-idl"; "cmdliner"; "re.str"; "oUnit"];
 Ocaml.ocamlflags := ["-thread"]
 --
 (*
@@ -18,19 +18,28 @@ Ocaml.ocamlflags := ["-thread"]
  *)
 open Common
 
-let command common =
-  `Ok ()
+module Command = struct
+  open Xapi.Storage.Types
+  include Query.Query
 
-(* Command-line parsing *)
-open Cmdliner
+  let command common { Query.Query.In.dbg } = {
+    driver = "driver";
+    name = "name";
+    description = "description";
+    vendor = "vendor";
+    copyright = "copyright";
+    version = "version";
+    required_api_version = "required_api_version";
+    features = [];
+    configuration = []
+  }
+end
 
-let cmd =
-  let doc = "query the capabilities of this storage driver" in
-  let man = help in
-  Term.(ret (pure command $ common_options_t)),
-  Term.info Sys.argv.(0) ~version:version ~sdocs:_common_options ~doc ~man
+module Test = struct
+  open OUnit
 
-let _ =
-  match Term.eval cmd with
-  | `Error _ -> exit 1
-  | _ -> exit 0
+  let test common = ()
+end
+
+module M = Make(Command)(Test)
+let _ = M.main ()

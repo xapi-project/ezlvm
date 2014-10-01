@@ -1,6 +1,6 @@
 #!/usr/bin/env ocamlscript
 Ocaml.sources := ["common.ml"; "lvm.ml"];
-Ocaml.packs := ["xcp.storage"; "cmdliner"; "re.str"; "oUnit"];
+Ocaml.packs := ["xapi-idl"; "cmdliner"; "re.str"; "oUnit"];
 Ocaml.ocamlflags := ["-thread"]
 --
 (*
@@ -18,41 +18,36 @@ Ocaml.ocamlflags := ["-thread"]
  *)
 open Common
 
-open OUnit
+module Command = struct
+  open Xapi.Storage.Types
+  include SR.Attach
 
-let test_vgs () =
-  let vol = Lvm.make_temp_volume () in
-  let vg_name = "hello" in
-  finally
-    (fun () ->
-      Lvm.vgcreate vg_name [ vol ];
-      let vgs = Lvm.vgs () in
-      if not(List.mem vg_name vgs)
-      then failwith (Printf.sprintf "%s not in vgs list: [%s]" vg_name (String.concat "; " vgs))
-    ) (fun () ->
-      Lvm.remove_temp_volume vol
-    )
+  let command common { SR.Attach.In.dbg; sr } =
+    ()
+end
 
-let test common =
-  let suite = "attach" >::: [
-    "vgs" >:: test_vgs;
-  ] in
-  ignore(run_test_tt ~verbose:common.Common.verbose suite)
+module Test = struct
+  open OUnit
 
-let command common =
-  if common.Common.test then test common;
-  `Ok ()
+  let test_vgs () =
+    let vol = Lvm.make_temp_volume () in
+    let vg_name = "hello" in
+    finally
+      (fun () ->
+        Lvm.vgcreate vg_name [ vol ];
+        let vgs = Lvm.vgs () in
+        if not(List.mem vg_name vgs)
+        then failwith (Printf.sprintf "%s not in vgs list: [%s]" vg_name (String.concat "; " vgs))
+      ) (fun () ->
+        Lvm.remove_temp_volume vol
+      )
 
-(* Command-line parsing *)
-open Cmdliner
+  let test common =
+    let suite = "attach" >::: [
+      "vgs" >:: test_vgs;
+    ] in
+    ignore(run_test_tt ~verbose:common.Common.verbose suite)
+end
 
-let cmd =
-  let doc = "attach a storage repository" in
-  let man = help in
-  Term.(ret (pure command $ common_options_t)),
-  Term.info Sys.argv.(0) ~version:version ~sdocs:_common_options ~doc ~man
-
-let _ =
-  match Term.eval cmd with
-  | `Error _ -> exit 1
-  | _ -> exit 0
+module M = Make(Command)(Test)
+let _ = M.main ()

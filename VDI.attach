@@ -1,6 +1,6 @@
 #!/usr/bin/env ocamlscript
 Ocaml.sources := ["common.ml"; "lvm.ml"];
-Ocaml.packs := ["xcp.storage"; "cmdliner"; "re.str"; "oUnit"];
+Ocaml.packs := ["xapi-idl"; "cmdliner"; "re.str"; "oUnit"];
 Ocaml.ocamlflags := ["-thread"]
 --
 (*
@@ -18,43 +18,40 @@ Ocaml.ocamlflags := ["-thread"]
  *)
 open Common
 
-open OUnit
+module Command = struct
+  open Xapi.Storage.Types
+  include VDI.Attach
 
-let test_stat () =
-  let vol = Lvm.make_temp_volume () in
-  let vg_name = "hello" in
-  finally
-    (fun () ->
-      Lvm.vgcreate vg_name [ vol ];
-      Lvm.lvcreate vg_name "testvol" 1L;
-      finally
-        (fun () ->
-          ignore(Unix.stat (Lvm.device vg_name "testvol"))
-        ) (fun () -> Lvm.lvremove vg_name "testvol")
-    ) (fun () ->
-      Lvm.remove_temp_volume vol
-    )
+  let command common { VDI.Attach.In.dbg; sr; vdi } =
+    let uri = Printf.sprintf "file:///dev/mapper/%s/%s" sr vdi in
+    let extra_headers = [] in
+    { uri; extra_headers }
+end
 
-let test common =
-  let suite = "attach" >::: [
-    "stat" >:: test_stat;
-  ] in
-  ignore(run_test_tt ~verbose:common.Common.verbose suite)
+module Test = struct
+  open OUnit
 
-let command common =
-  if common.Common.test then test common;
-  `Ok ()
+  let test_stat () =
+    let vol = Lvm.make_temp_volume () in
+    let vg_name = "hello" in
+    finally
+      (fun () ->
+        Lvm.vgcreate vg_name [ vol ];
+        Lvm.lvcreate vg_name "testvol" 1L;
+        finally
+          (fun () ->
+            ignore(Unix.stat (Lvm.device vg_name "testvol"))
+          ) (fun () -> Lvm.lvremove vg_name "testvol")
+      ) (fun () ->
+        Lvm.remove_temp_volume vol
+      )
 
-(* Command-line parsing *)
-open Cmdliner
+  let test common =
+    let suite = "attach" >::: [
+      "stat" >:: test_stat;
+    ] in
+    ignore(run_test_tt ~verbose:common.Common.verbose suite)
+end
 
-let cmd =
-  let doc = "attach a virtual disk" in
-  let man = help in
-  Term.(ret (pure command $ common_options_t)),
-  Term.info Sys.argv.(0) ~version:version ~sdocs:_common_options ~doc ~man
-
-let _ =
-  match Term.eval cmd with
-  | `Error _ -> exit 1
-  | _ -> exit 0
+module M = Make(Command)(Test)
+let _ = M.main ()
