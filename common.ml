@@ -245,3 +245,50 @@ let help = [
  `P "Use `$(mname) $(i,COMMAND) --help' for help on a single command."; `Noblank;
  `S "BUGS"; `P (Printf.sprintf "Check bug reports at %s" project_url);
 ]
+
+module type Command = sig
+  module In : sig
+    type t
+    val t_of_rpc: Rpc.t -> t
+    val rpc_of_t: t -> Rpc.t
+  end
+  module Out : sig
+    type t
+    val t_of_rpc: Rpc.t -> t
+    val rpc_of_t: t -> Rpc.t
+  end
+  module CommandLine : sig
+    val doc: string
+    val t: In.t Cmdliner.Term.t
+  end
+  val command: t -> In.t -> Out.t
+end
+module type Test = sig
+  val test: t -> unit
+end
+
+module Make(C: Command)(T: Test) = struct
+
+let wrap common args =
+  if common.test then begin
+    T.test common;
+    `Ok ()
+  end else begin
+    let result = C.command common args in
+    let rpc = C.Out.rpc_of_t result in
+    print_endline (Jsonrpc.to_string rpc);
+    `Ok ()
+  end
+
+let cmd =
+  let doc = C.CommandLine.doc in
+  let man = help in
+  Term.(ret (pure wrap $ common_options_t $ C.CommandLine.t)),
+  Term.info Sys.argv.(0) ~version:version ~sdocs:_common_options ~doc ~man
+
+let main () =
+  match Term.eval cmd with
+  | `Error _ -> exit 1
+  | _ -> exit 0
+
+end

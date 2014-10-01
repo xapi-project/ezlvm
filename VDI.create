@@ -17,12 +17,13 @@ Ocaml.ocamlflags := ["-thread"]
  * GNU Lesser General Public License for more details.
  *)
 
-open Xapi.Storage.Types.VDI.Create
-open Xapi.Storage.Types
 open Common
-open OUnit
 
-let command { In.dbg; sr; name_label; name_description; size } =
+module Command = struct
+  open Xapi.Storage.Types
+  include VDI.Create
+
+  let command common { VDI.Create.In.dbg; sr; name_label; name_description; size } =
   Lvm.lvcreate sr name_label Int64.( (size + mib - 1L) / mib );
   {
     vdi = name_label;
@@ -36,46 +37,29 @@ let command { In.dbg; sr; name_label; name_description; size } =
     virtual_size = size;
     physical_utilisation = 0L 
   }
+end
 
-let test_lvcreate () =
-  let vol = Lvm.make_temp_volume () in
-  let vg_name = "hello" in
-  finally
-    (fun () ->
-      Lvm.vgcreate vg_name [ vol ];
-      Lvm.lvcreate vg_name "testvol" 1L;
-      Lvm.lvremove vg_name "testvol";
-    ) (fun () ->
-      Lvm.remove_temp_volume vol
-    )
+module Test = struct
+  open OUnit
 
-let test common =
-  let suite = "create" >::: [
-    "lvcreate" >:: test_lvcreate;
-  ] in
-  ignore(run_test_tt ~verbose:common.Common.verbose suite)
+  let test_lvcreate () =
+    let vol = Lvm.make_temp_volume () in
+    let vg_name = "hello" in
+    finally
+      (fun () ->
+        Lvm.vgcreate vg_name [ vol ];
+        Lvm.lvcreate vg_name "testvol" 1L;
+        Lvm.lvremove vg_name "testvol";
+       ) (fun () ->
+        Lvm.remove_temp_volume vol
+      )
 
-(* Command-line parsing *)
-open Cmdliner
+  let test common =
+    let suite = "create" >::: [
+      "lvcreate" >:: test_lvcreate;
+    ] in
+    ignore(run_test_tt ~verbose:common.Common.verbose suite)
+end
 
-let wrap common args =
-  if common.Common.test then begin
-    test common;
-    `Ok ()
-  end else begin
-    let result = command args in
-    let rpc = Out.rpc_of_t result in
-    print_endline (Jsonrpc.to_string rpc);
-    `Ok ()
-  end
-
-let cmd =
-  let doc = "create a virtual disk (VDI)" in
-  let man = help in
-  Term.(ret (pure wrap $ common_options_t $ Xapi.Storage.Cmdline.VDI.Create.t)),
-  Term.info Sys.argv.(0) ~version:version ~sdocs:_common_options ~doc ~man
-
-let _ =
-  match Term.eval cmd with
-  | `Error _ -> exit 1
-  | _ -> exit 0
+module M = Make(Command)(Test)
+let _ = M.main ()
