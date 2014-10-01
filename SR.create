@@ -1,6 +1,6 @@
 #!/usr/bin/env ocamlscript
 Ocaml.sources := ["common.ml"; "lvm.ml"];
-Ocaml.packs := ["xcp.storage"; "oUnit"; "cmdliner"; "re.str"];
+Ocaml.packs := ["xapi-idl"; "cmdliner"; "re.str"; "oUnit"];
 Ocaml.ocamlflags := ["-thread"]
 --
 (*
@@ -19,33 +19,29 @@ Ocaml.ocamlflags := ["-thread"]
 
 open Common
 
-open OUnit
+module Command = struct
+  open Xapi.Storage.Types
+  include SR.Create
 
-let test_vgcreate () =
-  let tmp = Lvm.make_temp_volume () in
-  Lvm.vgcreate "hello" [ tmp ];
-  Lvm.remove_temp_volume tmp
+  let command common { SR.Create.In.dbg; sr } =
+    ()
+end
 
-let test common =
-  let suite = "create" >::: [
-    "vgcreate" >:: test_vgcreate;
-  ] in
-  ignore(run_test_tt ~verbose:common.Common.verbose suite)
+module Test = struct
+  open OUnit
 
-let command common =
-  if common.Common.test then test common;
-  `Ok ()
+  let test_vgcreate () =
+    let tmp = Lvm.make_temp_volume () in
+    Lvm.vgcreate "hello" [ tmp ];
+    Lvm.remove_temp_volume tmp
 
-(* Command-line parsing *)
-open Cmdliner
+  let test common =
+    let suite = "create" >::: [
+      "vgcreate" >:: test_vgcreate;
+    ] in
+    ignore(run_test_tt ~verbose:common.Common.verbose suite)
+end
 
-let cmd =
-  let doc = "create a storage repository" in
-  let man = help in
-  Term.(ret (pure command $ common_options_t)),
-  Term.info Sys.argv.(0) ~version:version ~sdocs:_common_options ~doc ~man
+module M = Make(Command)(Test)
+let _ = M.main ()
 
-let _ =
-  match Term.eval cmd with
-  | `Error _ -> exit 1
-  | _ -> exit 0
