@@ -20,8 +20,6 @@ let project_url = "https://github.com/xapi-project/ezlvm"
 
 let ignore_string (_: string) = ()
 
-open Xcp_service
-
 let log fmt =
   Printf.ksprintf
     (fun s ->
@@ -208,6 +206,19 @@ let run ?(env= [| |]) ?stdin cmd args =
     close_all ();
     raise e
 
+module Int64 = struct
+  include Int64
+
+  let ( + ) = Int64.add
+  let ( - ) = Int64.sub
+  let ( * ) = Int64.mul
+  let ( / ) = Int64.div
+end
+
+let kib = 1024L
+let mib = Int64.(kib * kib)
+let gib = Int64.(mib * kib)
+let tib = Int64.(gib * kib)
 
 open Cmdliner
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env ocamlscript
 Ocaml.sources := ["common.ml"; "lvm.ml"];
-Ocaml.packs := ["xcp.storage"; "oUnit"; "cmdliner"; "re.str"];
+Ocaml.packs := ["xapi-idl"; "cmdliner"; "re.str"; "ounit"];
 Ocaml.ocamlflags := ["-thread"]
 --
 (*
@@ -17,9 +17,25 @@ Ocaml.ocamlflags := ["-thread"]
  * GNU Lesser General Public License for more details.
  *)
 
+open Xapi.Storage.Types.VDI.Create
+open Xapi.Storage.Types
 open Common
-
 open OUnit
+
+let command { In.dbg; sr; name_label; name_description; size } =
+  Lvm.lvcreate sr name_label Int64.( (size + mib - 1L) / mib );
+  {
+    vdi = name_label;
+    content_id = "";
+    name_label = name_label;
+    name_description = name_description;
+    is_a_snapshot = false;
+    snapshot_time = "";
+    snapshot_of = "";
+    read_only = false;
+    virtual_size = size;
+    physical_utilisation = 0L 
+  }
 
 let test_lvcreate () =
   let vol = Lvm.make_temp_volume () in
@@ -39,17 +55,24 @@ let test common =
   ] in
   ignore(run_test_tt ~verbose:common.Common.verbose suite)
 
-let command common =
-  if common.Common.test then test common;
-  `Ok ()
-
 (* Command-line parsing *)
 open Cmdliner
+
+let wrap common args =
+  if common.Common.test then begin
+    test common;
+    `Ok ()
+  end else begin
+    let result = command args in
+    let rpc = Out.rpc_of_t result in
+    print_endline (Jsonrpc.to_string rpc);
+    `Ok ()
+  end
 
 let cmd =
   let doc = "create a virtual disk (VDI)" in
   let man = help in
-  Term.(ret (pure command $ common_options_t)),
+  Term.(ret (pure wrap $ common_options_t $ Xapi.Storage.Cmdline.VDI.Create.t)),
   Term.info Sys.argv.(0) ~version:version ~sdocs:_common_options ~doc ~man
 
 let _ =
