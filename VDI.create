@@ -1,6 +1,6 @@
 #!/usr/bin/env ocamlscript
 Ocaml.sources := ["common.ml"; "lvm.ml"];
-Ocaml.packs := ["xapi-idl"; "cmdliner"; "re.str"; "ounit"];
+Ocaml.packs := ["xapi-idl"; "cmdliner"; "re.str"; "oUnit"];
 Ocaml.ocamlflags := ["-thread"]
 --
 (*
