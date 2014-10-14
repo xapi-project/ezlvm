@@ -1,4 +1,4 @@
-OPAM_DEPENDS="xcp ocamlscript cmdliner"
+OPAM_DEPENDS="xapi-idl ocamlscript cmdliner re ounit uri xapi-storage"
 
 case "$OCAML_VERSION,$OPAM_VERSION" in
 3.12.1,1.0.0) ppa=avsm/ocaml312+opam10 ;;

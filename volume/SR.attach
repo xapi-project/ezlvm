@@ -1,6 +1,6 @@
 #!/usr/bin/env ocamlscript
 Ocaml.sources := ["common.ml"; "lvm.ml"];
-Ocaml.packs := ["xapi-idl"; "cmdliner"; "re.str"; "oUnit"];
+Ocaml.packs := ["xapi-storage"; "cmdliner"; "re.str"; "oUnit"; "uri"];
 Ocaml.ocamlflags := ["-thread"]
 --
 (*
@@ -19,11 +19,15 @@ Ocaml.ocamlflags := ["-thread"]
 open Common
 
 module Command = struct
-  open Xapi.Storage.Types
+  open Storage.V.Types
   include SR.Attach
 
-  let command common { SR.Attach.In.dbg; sr } =
-    ()
+  let command common { SR.Attach.In.dbg; uri } =
+    let vg = vg_of_uri uri in
+    let vgs = Lvm.vgs () in
+    if not(List.mem vg vgs)
+    then raise (Storage.V.SR_does_not_exist vg);
+    vg
 end
 
 module Test = struct
@@ -47,6 +51,7 @@ module Test = struct
       "vgs" >:: test_vgs;
     ] in
     ignore(run_test_tt ~verbose:common.Common.verbose suite)
+
 end
 
 module M = Make(Command)(Test)

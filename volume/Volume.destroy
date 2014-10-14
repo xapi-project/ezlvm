@@ -1,6 +1,6 @@
 #!/usr/bin/env ocamlscript
 Ocaml.sources := ["common.ml"; "lvm.ml"];
-Ocaml.packs := ["xapi-idl"; "cmdliner"; "re.str"; "oUnit"];
+Ocaml.packs := ["xapi-storage"; "cmdliner"; "re.str"; "oUnit"; "uri"];
 Ocaml.ocamlflags := ["-thread"]
 --
 (*
@@ -19,12 +19,11 @@ Ocaml.ocamlflags := ["-thread"]
 open Common
 
 module Command = struct
-  open Xapi.Storage.Types
-  include VDI.Detach
+  open Storage.V.Types
+  include Volume.Destroy
 
-  (* We leave volumes permanently activated *)
-
-  let command common { VDI.Detach.In.dbg; sr; vdi } = ()
+  let command common { Volume.Destroy.In.dbg; sr; key } =
+    Lvm.lvremove sr key
 end
 
 module Test = struct

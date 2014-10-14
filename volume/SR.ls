@@ -1,6 +1,6 @@
 #!/usr/bin/env ocamlscript
 Ocaml.sources := ["common.ml"; "lvm.ml"];
-Ocaml.packs := ["xapi-idl"; "cmdliner"; "re.str"; "oUnit"];
+Ocaml.packs := ["xapi-storage"; "cmdliner"; "re.str"; "oUnit"; "uri"];
 Ocaml.ocamlflags := ["-thread"]
 --
 (*
@@ -16,15 +16,14 @@ Ocaml.ocamlflags := ["-thread"]
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Lesser General Public License for more details.
  *)
-
 open Common
 
 module Command = struct
-  open Xapi.Storage.Types
-  include SR.Scan
+  open Storage.V.Types
+  include SR.Ls
 
-  let command common { SR.Scan.In.dbg; sr } =
-    []
+  let command common { SR.Ls.In.dbg; sr } =
+    List.map (Lvm.volume_of_lv sr) (Lvm.lvs sr)
 end
 
 module Test = struct
@@ -40,7 +39,7 @@ module Test = struct
         finally
           (fun () ->
             match Lvm.lvs vg_name with
-            | [ { Lvm.name = "testvol"; tags = [] } ] -> ()
+            | [ { Lvm.name = "testvol" } ] -> ()
             | [ ] -> failwith "I created 'testvol' but it didnt show in 'lvs'"
             | _ -> failwith "I created 'testvol' but multiple volumes showed up in 'lvs'"
           ) (fun () ->
@@ -55,6 +54,7 @@ module Test = struct
       "lvs" >:: test_lvs;
     ] in
     ignore(run_test_tt ~verbose:common.Common.verbose suite)
+
 end
 
 module M = Make(Command)(Test)

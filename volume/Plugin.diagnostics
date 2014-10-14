@@ -1,6 +1,6 @@
 #!/usr/bin/env ocamlscript
 Ocaml.sources := ["common.ml"; "lvm.ml"];
-Ocaml.packs := ["xapi-idl"; "cmdliner"; "re.str"; "oUnit"];
+Ocaml.packs := ["xapi-storage"; "cmdliner"; "re.str"; "oUnit"; "uri"];
 Ocaml.ocamlflags := ["-thread"]
 --
 (*
@@ -19,11 +19,11 @@ Ocaml.ocamlflags := ["-thread"]
 open Common
 
 module Command = struct
-  open Xapi.Storage.Types
-  include SR.Detach
+  open Storage.P.Types
+  include Plugin.Diagnostics
 
-  let command common { SR.Detach.In.dbg; sr } =
-    ()
+  let command common { Plugin.Diagnostics.In.dbg } =
+    "Not yet implemented"
 end
 
 module Test = struct
