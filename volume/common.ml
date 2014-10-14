@@ -35,11 +35,12 @@ type t = {
   verbose: bool;
   debug: bool;
   test: bool;
+  json: bool;
 }
 (** options common to all subcommands *)
 
-let make verbose debug test =
-  { verbose; debug; test }
+let make verbose debug test json =
+  { verbose; debug; test; json }
 
 let finally f g =
   try
@@ -236,7 +237,10 @@ let common_options_t =
   let test =
     let doc = "Perform self-tests." in
     Arg.(value & flag & info ["test"] ~docs ~doc) in
-  Term.(pure make $ debug $ verb $ test)
+  let json =
+    let doc = "Expect json on stdin, print json on stdout." in
+    Arg.(value & flag & info ["json"] ~docs ~doc) in
+  Term.(pure make $ debug $ verb $ test $ json)
 
 let help = [
  `S _common_options;
@@ -270,6 +274,10 @@ end
 module Make(C: Command)(T: Test) = struct
 
 let wrap common args =
+  let args =
+    if common.json
+    then read_line () |> Jsonrpc.of_string |> C.In.t_of_rpc
+    else args in
   if common.test then begin
     T.test common;
     `Ok ()
@@ -292,3 +300,11 @@ let main () =
   | _ -> exit 0
 
 end
+
+let vg_of_uri uri =
+  let uri' = Uri.of_string uri in
+  match Uri.scheme uri' with
+  | Some "vg" ->
+    let vg = Uri.path uri' in
+    if vg <> "" && vg.[0] = '/' then String.sub vg 1 (String.length vg - 1) else vg
+  | _ -> raise (Storage.V.SR_does_not_exist uri)

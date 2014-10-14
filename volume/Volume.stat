@@ -1,6 +1,6 @@
 #!/usr/bin/env ocamlscript
 Ocaml.sources := ["common.ml"; "lvm.ml"];
-Ocaml.packs := ["xapi-idl"; "cmdliner"; "re.str"; "oUnit"];
+Ocaml.packs := ["xapi-storage"; "cmdliner"; "re.str"; "oUnit"; "uri"];
 Ocaml.ocamlflags := ["-thread"]
 --
 (*
@@ -19,20 +19,15 @@ Ocaml.ocamlflags := ["-thread"]
 open Common
 
 module Command = struct
-  open Xapi.Storage.Types
-  include Query.Query
+  open Storage.V.Types
+  include Volume.Stat
 
-  let command common { Query.Query.In.dbg } = {
-    driver = "driver";
-    name = "name";
-    description = "description";
-    vendor = "vendor";
-    copyright = "copyright";
-    version = "version";
-    required_api_version = "required_api_version";
-    features = [];
-    configuration = []
-  }
+  let command common { Volume.Stat.In.dbg; sr; key } =
+    let all = Lvm.lvs sr in
+    try
+      Lvm.volume_of_lv sr (List.find (fun x -> x.Lvm.name = key) all)
+    with Not_found ->
+      raise (Storage.V.Volume_does_not_exist key)
 end
 
 module Test = struct

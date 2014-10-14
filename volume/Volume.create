@@ -1,6 +1,6 @@
 #!/usr/bin/env ocamlscript
 Ocaml.sources := ["common.ml"; "lvm.ml"];
-Ocaml.packs := ["xapi-idl"; "cmdliner"; "re.str"; "oUnit"];
+Ocaml.packs := ["xapi-storage"; "cmdliner"; "re.str"; "oUnit"; "uri"];
 Ocaml.ocamlflags := ["-thread"]
 --
 (*
@@ -16,27 +16,24 @@ Ocaml.ocamlflags := ["-thread"]
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Lesser General Public License for more details.
  *)
-
 open Common
 
 module Command = struct
-  open Xapi.Storage.Types
-  include VDI.Create
+  open Storage.V.Types
+  include Volume.Create
 
-  let command common { VDI.Create.In.dbg; sr; name_label; name_description; size } =
-  Lvm.lvcreate sr name_label Int64.( (size + mib - 1L) / mib );
-  {
-    vdi = name_label;
-    content_id = "";
-    name_label = name_label;
-    name_description = name_description;
-    is_a_snapshot = false;
-    snapshot_time = "";
-    snapshot_of = "";
-    read_only = false;
-    virtual_size = size;
-    physical_utilisation = 0L 
-  }
+  let command common { Volume.Create.In.dbg; sr; name; description; size } =
+    (* LVM refuses to create a disk with 0 extents *)
+    let size = max size 1L in
+    Lvm.lvcreate sr name size;
+    {
+      key = name;
+      name = name;
+      description = description;
+      read_write = true;
+      uri = ["block://" ^ (Lvm.path_of sr name) ];
+      virtual_size = size;
+    }
 end
 
 module Test = struct
@@ -49,8 +46,8 @@ module Test = struct
       (fun () ->
         Lvm.vgcreate vg_name [ vol ];
         Lvm.lvcreate vg_name "testvol" 1L;
-        Lvm.lvremove vg_name "testvol";
-       ) (fun () ->
+        Lvm.lvremove vg_name "testvol"
+      ) (fun () ->
         Lvm.remove_temp_volume vol
       )
 

@@ -1,13 +1,13 @@
-COMMANDS=SR.create SR.scan VDI.create VDI.destroy VDI.attach VDI.detach SR.destroy VDI.resize SR.attach
+SUBDIRS=volume
 
 .PHONY: clean
 clean:
-	rm -f *.exe
+	for dir in $(SUBDIRS); do \
+          $(MAKE) -C $$dir clean; \
+        done
 
 .PHONY: test
 test:
-	# Running the commands will invoke the typechecker
-	for command in $(COMMANDS); do \
-	        echo $$command ; \
-		./$$command --test ; \
-	done
+	for dir in $(SUBDIRS); do \
+          $(MAKE) -C $$dir test; \
+        done

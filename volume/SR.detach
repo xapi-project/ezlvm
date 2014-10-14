@@ -1,6 +1,6 @@
 #!/usr/bin/env ocamlscript
 Ocaml.sources := ["common.ml"; "lvm.ml"];
-Ocaml.packs := ["xapi-idl"; "cmdliner"; "re.str"; "oUnit"];
+Ocaml.packs := ["xapi-storage"; "cmdliner"; "re.str"; "oUnit"; "uri"];
 Ocaml.ocamlflags := ["-thread"]
 --
 (*
@@ -16,32 +16,21 @@ Ocaml.ocamlflags := ["-thread"]
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Lesser General Public License for more details.
  *)
-
 open Common
 
 module Command = struct
-  open Xapi.Storage.Types
-  include SR.Destroy
+  open Storage.V.Types
+  include SR.Detach
 
-  let command common { SR.Destroy.In.dbg; sr } =
+  let command common { SR.Detach.In.dbg; sr } =
     ()
 end
 
 module Test = struct
   open OUnit
 
-  let test_vgcreate () =
-    let tmp = Lvm.make_temp_volume () in
-    Lvm.vgcreate "hello" [ tmp ];
-    Lvm.remove_temp_volume tmp
-
-  let test common =
-    let suite = "create" >::: [
-      "vgcreate" >:: test_vgcreate;
-    ] in
-    ignore(run_test_tt ~verbose:common.Common.verbose suite)
+  let test common = ()
 end
 
 module M = Make(Command)(Test)
 let _ = M.main ()
-
