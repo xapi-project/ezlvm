@@ -1,13 +1,13 @@
-COMMANDS=Plugin.Query Plugin.diagnostics SR.create SR.ls SR.destroy SR.attach SR.detach Volume.create Volume.destroy Volume.stat
+SUBDIRS=volume
 
 .PHONY: clean
 clean:
-	rm -f *.exe
+	for dir in $(SUBDIRS); do \
+          $(MAKE) -C $$dir clean; \
+        done
 
 .PHONY: test
 test:
-	# Running the commands will invoke the typechecker
-	for command in $(COMMANDS); do \
-	        echo $$command ; \
-		./$$command --test ; \
-	done
+	for dir in $(SUBDIRS); do \
+          $(MAKE) -C $$dir test; \
+        done
