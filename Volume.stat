@@ -20,38 +20,20 @@ open Common
 
 module Command = struct
   open Storage.V.Types
-  include SR.Attach
+  include Volume.Stat
 
-  let command common { SR.Attach.In.dbg; uri } =
-    let vg = vg_of_uri uri in
-    let vgs = Lvm.vgs () in
-    if not(List.mem vg vgs)
-    then raise (Storage.V.SR_does_not_exist vg);
-    vg
+  let command common { Volume.Stat.In.dbg; sr; key } =
+    let all = Lvm.lvs sr in
+    try
+      Lvm.volume_of_lv sr (List.find (fun x -> x.Lvm.name = key) all)
+    with Not_found ->
+      raise (Storage.V.Volume_does_not_exist key)
 end
 
 module Test = struct
   open OUnit
 
-  let test_vgs () =
-    let vol = Lvm.make_temp_volume () in
-    let vg_name = "hello" in
-    finally
-      (fun () ->
-        Lvm.vgcreate vg_name [ vol ];
-        let vgs = Lvm.vgs () in
-        if not(List.mem vg_name vgs)
-        then failwith (Printf.sprintf "%s not in vgs list: [%s]" vg_name (String.concat "; " vgs))
-      ) (fun () ->
-        Lvm.remove_temp_volume vol
-      )
-
-  let test common =
-    let suite = "attach" >::: [
-      "vgs" >:: test_vgs;
-    ] in
-    ignore(run_test_tt ~verbose:common.Common.verbose suite)
-
+  let test common = ()
 end
 
 module M = Make(Command)(Test)

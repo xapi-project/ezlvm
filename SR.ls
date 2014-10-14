@@ -20,35 +20,38 @@ open Common
 
 module Command = struct
   open Storage.V.Types
-  include SR.Attach
+  include SR.Ls
 
-  let command common { SR.Attach.In.dbg; uri } =
-    let vg = vg_of_uri uri in
-    let vgs = Lvm.vgs () in
-    if not(List.mem vg vgs)
-    then raise (Storage.V.SR_does_not_exist vg);
-    vg
+  let command common { SR.Ls.In.dbg; sr } =
+    List.map (Lvm.volume_of_lv sr) (Lvm.lvs sr)
 end
 
 module Test = struct
   open OUnit
 
-  let test_vgs () =
+  let test_lvs () =
     let vol = Lvm.make_temp_volume () in
     let vg_name = "hello" in
     finally
       (fun () ->
         Lvm.vgcreate vg_name [ vol ];
-        let vgs = Lvm.vgs () in
-        if not(List.mem vg_name vgs)
-        then failwith (Printf.sprintf "%s not in vgs list: [%s]" vg_name (String.concat "; " vgs))
+        Lvm.lvcreate vg_name "testvol" 1L;
+        finally
+          (fun () ->
+            match Lvm.lvs vg_name with
+            | [ { Lvm.name = "testvol" } ] -> ()
+            | [ ] -> failwith "I created 'testvol' but it didnt show in 'lvs'"
+            | _ -> failwith "I created 'testvol' but multiple volumes showed up in 'lvs'"
+          ) (fun () ->
+            Lvm.lvremove vg_name "testvol"
+          )
       ) (fun () ->
         Lvm.remove_temp_volume vol
       )
 
   let test common =
-    let suite = "attach" >::: [
-      "vgs" >:: test_vgs;
+    let suite = "create" >::: [
+      "lvs" >:: test_lvs;
     ] in
     ignore(run_test_tt ~verbose:common.Common.verbose suite)
 

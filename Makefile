@@ -1,4 +1,4 @@
-COMMANDS=SR.create SR.scan VDI.create VDI.destroy VDI.attach VDI.detach SR.destroy VDI.resize SR.attach
+COMMANDS=Plugin.Query Plugin.diagnostics SR.create SR.ls SR.destroy SR.attach SR.detach Volume.create Volume.destroy Volume.stat
 
 .PHONY: clean
 clean:

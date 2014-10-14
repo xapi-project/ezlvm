@@ -20,8 +20,6 @@ let project_url = "https://github.com/xapi-project/ezlvm"
 
 let ignore_string (_: string) = ()
 
-open Xcp_service
-
 let log fmt =
   Printf.ksprintf
     (fun s ->
@@ -37,11 +35,12 @@ type t = {
   verbose: bool;
   debug: bool;
   test: bool;
+  json: bool;
 }
 (** options common to all subcommands *)
 
-let make verbose debug test =
-  { verbose; debug; test }
+let make verbose debug test json =
+  { verbose; debug; test; json }
 
 let finally f g =
   try
@@ -208,6 +207,19 @@ let run ?(env= [| |]) ?stdin cmd args =
     close_all ();
     raise e
 
+module Int64 = struct
+  include Int64
+
+  let ( + ) = Int64.add
+  let ( - ) = Int64.sub
+  let ( * ) = Int64.mul
+  let ( / ) = Int64.div
+end
+
+let kib = 1024L
+let mib = Int64.(kib * kib)
+let gib = Int64.(mib * kib)
+let tib = Int64.(gib * kib)
 
 open Cmdliner
 
@@ -225,7 +237,10 @@ let common_options_t =
   let test =
     let doc = "Perform self-tests." in
     Arg.(value & flag & info ["test"] ~docs ~doc) in
-  Term.(pure make $ debug $ verb $ test)
+  let json =
+    let doc = "Expect json on stdin, print json on stdout." in
+    Arg.(value & flag & info ["json"] ~docs ~doc) in
+  Term.(pure make $ debug $ verb $ test $ json)
 
 let help = [
  `S _common_options;
@@ -234,3 +249,62 @@ let help = [
  `P "Use `$(mname) $(i,COMMAND) --help' for help on a single command."; `Noblank;
  `S "BUGS"; `P (Printf.sprintf "Check bug reports at %s" project_url);
 ]
+
+module type Command = sig
+  module In : sig
+    type t
+    val t_of_rpc: Rpc.t -> t
+    val rpc_of_t: t -> Rpc.t
+  end
+  module Out : sig
+    type t
+    val t_of_rpc: Rpc.t -> t
+    val rpc_of_t: t -> Rpc.t
+  end
+  module CommandLine : sig
+    val doc: string
+    val t: In.t Cmdliner.Term.t
+  end
+  val command: t -> In.t -> Out.t
+end
+module type Test = sig
+  val test: t -> unit
+end
+
+module Make(C: Command)(T: Test) = struct
+
+let wrap common args =
+  let args =
+    if common.json
+    then read_line () |> Jsonrpc.of_string |> C.In.t_of_rpc
+    else args in
+  if common.test then begin
+    T.test common;
+    `Ok ()
+  end else begin
+    let result = C.command common args in
+    let rpc = C.Out.rpc_of_t result in
+    print_endline (Jsonrpc.to_string rpc);
+    `Ok ()
+  end
+
+let cmd =
+  let doc = C.CommandLine.doc in
+  let man = help in
+  Term.(ret (pure wrap $ common_options_t $ C.CommandLine.t)),
+  Term.info Sys.argv.(0) ~version:version ~sdocs:_common_options ~doc ~man
+
+let main () =
+  match Term.eval cmd with
+  | `Error _ -> exit 1
+  | _ -> exit 0
+
+end
+
+let vg_of_uri uri =
+  let uri' = Uri.of_string uri in
+  match Uri.scheme uri' with
+  | Some "vg" ->
+    let vg = Uri.path uri' in
+    if vg <> "" && vg.[0] = '/' then String.sub vg 1 (String.length vg - 1) else vg
+  | _ -> raise (Storage.V.SR_does_not_exist uri)

@@ -1,6 +1,6 @@
 #!/usr/bin/env ocamlscript
 Ocaml.sources := ["common.ml"; "lvm.ml"];
-Ocaml.packs := ["xcp.storage"; "cmdliner"; "re.str"; "oUnit"];
+Ocaml.packs := ["xapi-storage"; "cmdliner"; "re.str"; "oUnit"; "uri"];
 Ocaml.ocamlflags := ["-thread"]
 --
 (*
@@ -18,20 +18,20 @@ Ocaml.ocamlflags := ["-thread"]
  *)
 open Common
 
-(* We leave volumes groups alone so they can be recovered afterwards. *)
-let command common =
-  `Ok ()
+module Command = struct
+  open Storage.V.Types
+  include SR.Destroy
 
-(* Command-line parsing *)
-open Cmdliner
+  let command common { SR.Destroy.In.dbg; sr } =
+    (* We leave the data intact *)
+    ()
+end
 
-let cmd =
-  let doc = "destroy a storage repository" in
-  let man = help in
-  Term.(ret (pure command $ common_options_t)),
-  Term.info Sys.argv.(0) ~version:version ~sdocs:_common_options ~doc ~man
+module Test = struct
+  open OUnit
 
-let _ =
-  match Term.eval cmd with
-  | `Error _ -> exit 1
-  | _ -> exit 0
+  let test common = ()
+end
+
+module M = Make(Command)(Test)
+let _ = M.main ()

@@ -20,38 +20,42 @@ open Common
 
 module Command = struct
   open Storage.V.Types
-  include SR.Attach
+  include Volume.Create
 
-  let command common { SR.Attach.In.dbg; uri } =
-    let vg = vg_of_uri uri in
-    let vgs = Lvm.vgs () in
-    if not(List.mem vg vgs)
-    then raise (Storage.V.SR_does_not_exist vg);
-    vg
+  let command common { Volume.Create.In.dbg; sr; name; description; size } =
+    (* LVM refuses to create a disk with 0 extents *)
+    let size = max size 1L in
+    Lvm.lvcreate sr name size;
+    {
+      key = name;
+      name = name;
+      description = description;
+      read_write = true;
+      uri = ["block://" ^ (Lvm.path_of sr name) ];
+      virtual_size = size;
+    }
 end
 
 module Test = struct
   open OUnit
 
-  let test_vgs () =
+  let test_lvcreate () =
     let vol = Lvm.make_temp_volume () in
     let vg_name = "hello" in
     finally
       (fun () ->
         Lvm.vgcreate vg_name [ vol ];
-        let vgs = Lvm.vgs () in
-        if not(List.mem vg_name vgs)
-        then failwith (Printf.sprintf "%s not in vgs list: [%s]" vg_name (String.concat "; " vgs))
+        Lvm.lvcreate vg_name "testvol" 1L;
+        Lvm.lvremove vg_name "testvol"
       ) (fun () ->
         Lvm.remove_temp_volume vol
       )
 
   let test common =
-    let suite = "attach" >::: [
-      "vgs" >:: test_vgs;
+    let suite = "create" >::: [
+      "lvcreate" >:: test_lvcreate;
     ] in
     ignore(run_test_tt ~verbose:common.Common.verbose suite)
-
 end
 
 module M = Make(Command)(Test)
