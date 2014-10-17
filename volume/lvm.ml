@@ -172,8 +172,9 @@ let vgs () =
 
 let dash = Re_str.regexp_string "-"
 let path_of vg lv =
+  let vg' = Re_str.split_delim dash vg in
   let lv' = Re_str.split_delim dash lv in
-  "/dev/mapper/" ^ vg ^ "-" ^ (String.concat "--" lv')
+  "/dev/mapper/" ^ (String.concat "--" vg') ^ "-" ^ (String.concat "--" lv')
 
 let volume_of_lv sr lv = {
   Storage.V.Types.key = lv.name;
