@@ -14,6 +14,32 @@
 
 open Common
 
+(* The rules for LV names from 'man lvm': *)
+let legal_lv_char = function
+| 'a'..'z' | 'A' .. 'Z' | '0' .. '9' | '+' | '_' | '.' | '-' -> true
+| _ -> false
+
+let illegal_lv_names = [ "."; ".."; "snapshot"; "pvmove" ]
+let illegal_lv_substrings =
+  List.map Re_str.regexp_string
+  [ "_mlog"; "_mimage"; "_rimage"; "_tdata"; "_tmeta" ]
+
+let mangle_lv_name x : string =
+  if List.mem x illegal_lv_names (* hopeless *)
+  then "unknown-volume"
+  else begin
+    (* Remove illegal characters *)
+    let result = String.copy x in
+    for i = 0 to String.length result - 1 do
+      result.[i] <- if legal_lv_char result.[i] then result.[i] else '_'
+    done;
+    (* Remove illegal substrings *)
+    let rec loop acc = function
+    | [] -> acc
+    | r :: rs -> loop (Re_str.global_replace r "_" acc) rs in
+    loop result illegal_lv_substrings
+  end
+
 let make_temp_volume () =
   let path = Filename.temp_file Sys.argv.(0) "volume" in
   ignore_string (Common.run "dd" [ "if=/dev/zero"; "of=" ^ path; "seek=1024"; "bs=1M"; "count=1"]);
@@ -49,12 +75,8 @@ let vgcreate vg_name = function
     List.iter (fun dev -> ignore_string (run "vgextend" [ vg_name; dev ])) ds;
     ignore_string (run "vgchange" [ "-an"; vg_name ])
 
-let lvcreate vg_name lv_name bytes =
-  let size_mb = Int64.to_string (Int64.div (Int64.add 1048575L bytes) (1048576L)) in
-  ignore_string (Common.run "lvcreate" [ "-L"; size_mb; "-n"; lv_name; vg_name; "-Z"; "n" ])
-
-let lvremove vg_name lv_name =
-  ignore_string(Common.run "lvremove" [ "-f"; Printf.sprintf "%s/%s" vg_name lv_name])
+let vgremove vg_name =
+  ignore_string(run "vgremove" [ "-f"; vg_name ])
 
 type lv = {
   name: string;
@@ -80,6 +102,41 @@ let lvs vg_name =
         debug "Couldn't parse the LV name/ size: [%s]" line;
         failwith (Printf.sprintf "Couldn't parse the LV name/ size: [%s]" line)
     )
+
+(* If a volume already exists then we see this on stderr:
+   'Logical volume "testvol" already exists in volume group' *)
+let volume_already_exists = Re_str.regexp_string "already exists in volume group"
+let find r string =
+  try
+    let (_: int) = Re_str.search_forward r string 0 in
+    true
+  with Not_found ->
+    false
+
+let lvcreate vg_name lv_name bytes =
+  let size_mb = Int64.to_string (Int64.div (Int64.add 1048575L bytes) (1048576L)) in
+  let lv_name = mangle_lv_name lv_name in
+  let lv_name' = String.length lv_name in
+  let rec retry attempts_remaining suffix =
+    try
+      let lv_name = if suffix = 0 then lv_name else lv_name ^ (string_of_int suffix) in
+      ignore_string (Common.run "lvcreate" [ "-L"; size_mb; "-n"; lv_name; vg_name; "-Z"; "n" ]);
+      lv_name
+    with Common.Bad_exit(5, _, _, stdout, stderr) as e->
+      if find volume_already_exists stderr then begin
+        let largest_suffix =
+          lvs vg_name
+          |>  (List.map (fun lv -> lv.name))
+          |>  (List.filter (startswith lv_name))
+          |>  (List.map (fun x -> String.sub x lv_name' (String.length x - lv_name')))
+          |>  (List.map (fun x -> try int_of_string x with _ -> 0))
+          |>  (List.fold_left max 0) in
+        retry (attempts_remaining - 1) (largest_suffix + 1)
+      end else raise e in
+  retry 5 0
+
+let lvremove vg_name lv_name =
+  ignore_string(Common.run "lvremove" [ "-f"; Printf.sprintf "%s/%s" vg_name lv_name])
 
 let device vg_name lv_name = Printf.sprintf "/dev/%s/%s" vg_name lv_name
 
@@ -126,3 +183,4 @@ let volume_of_lv sr lv = {
   uri = ["block://" ^ (path_of sr lv.name) ];
   virtual_size = lv.size;
 }
+

@@ -157,6 +157,8 @@ let canonicalise x =
     | Some hit -> hit
   end
 
+exception Bad_exit of int * string * string list * string * string
+
 let run ?(env= [| |]) ?stdin cmd args =
   let cmd = canonicalise cmd in
   debug "%s %s" cmd (String.concat " " args);
@@ -167,20 +169,40 @@ let run ?(env= [| |]) ?stdin cmd args =
       to_close := List.filter (fun x -> x <> fd) !to_close;
       Unix.close fd
     end in
-  let close_all () = List.iter close !to_close in
-  try
+  let read_all fd =
     let b = Buffer.create 128 in
     let tmp = String.make 4096 '\000' in
-    let readable, writable = Unix.pipe () in
-    to_close := readable :: writable :: !to_close;
-
+    let finished = ref false in
+    while not !finished do
+      let n = Unix.read fd tmp 0 (String.length tmp) in
+      Buffer.add_substring b tmp 0 n;
+      finished := n = 0
+    done;
+    Buffer.contents b in
+  let close_all () = List.iter close !to_close in
+  try
+    (* stdin is a pipe *)
     let stdin_readable, stdin_writable = Unix.pipe () in
     to_close := stdin_readable :: stdin_writable :: !to_close;
+    (* stdout buffers to a temp file *)
+    let stdout_filename = Filename.temp_file Sys.argv.(0) "stdout" in
+    let stdout_readable = Unix.openfile stdout_filename [ Unix.O_RDONLY; Unix.O_CREAT; Unix.O_CLOEXEC ] 0o0600 in
+    let stdout_writable = Unix.openfile stdout_filename [ Unix.O_WRONLY ] 0o0600 in
+    to_close := stdout_readable :: stdout_writable :: !to_close;
+    (* Unix.unlink stdout_filename; *)
+    (* stderr buffers to a temp file *)
+    let stderr_filename = Filename.temp_file Sys.argv.(0) "stderr" in
+    let stderr_readable = Unix.openfile stderr_filename [ Unix.O_RDONLY; Unix.O_CREAT; Unix.O_CLOEXEC ] 0o0600 in
+    let stderr_writable = Unix.openfile stderr_filename [ Unix.O_WRONLY ] 0o0600 in
+    to_close := stderr_readable :: stderr_writable :: !to_close;
+    (*Unix.unlink stderr_filename;*)
 
-    let pid = Unix.create_process_env cmd (Array.of_list (cmd :: args)) env stdin_readable writable Unix.stderr in
-    close writable;
+    let pid = Unix.create_process_env cmd (Array.of_list (cmd :: args)) env stdin_readable stdout_writable stderr_writable in
     close stdin_readable;
-    (* assume 'stdin' is small such that this won't block *)
+    close stdout_writable;
+    close stderr_writable;
+
+    (* pump the input to stdin while the output is streaming to the unlinked files *)
     begin match stdin with
     | None -> ()
     | Some txt ->
@@ -189,18 +211,18 @@ let run ?(env= [| |]) ?stdin cmd args =
       then failwith (Printf.sprintf "short write to process stdin: only wrote %d bytes" n);
     end;
     close stdin_writable;
-    let finished = ref false in
-    while not !finished do
-      let n = Unix.read readable tmp 0 (String.length tmp) in
-      Buffer.add_substring b tmp 0 n;
-      finished := n = 0
-    done;
-    close_all ();
+
     let _, status = Unix.waitpid [] pid in
+
+    let stdout = read_all stdout_readable in
+    let stderr = read_all stderr_readable in    
+    close_all ();
+
     match status with
-    | Unix.WEXITED 0 -> Buffer.contents b
+    | Unix.WEXITED 0 ->
+      stdout
     | Unix.WEXITED n ->
-      failwith (Printf.sprintf "%s %s: %d (%s)" cmd (String.concat " " args) n (Buffer.contents b))
+      raise (Bad_exit(n, cmd, args, stdout, stderr))
     | _ ->
       failwith (Printf.sprintf "%s %s failed" cmd (String.concat " " args))
   with e ->

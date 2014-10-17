@@ -35,7 +35,7 @@ module Test = struct
     finally
       (fun () ->
         Lvm.vgcreate vg_name [ vol ];
-        Lvm.lvcreate vg_name "testvol" 1L;
+        let _ = Lvm.lvcreate vg_name "testvol" 1L in
         finally
           (fun () ->
             match Lvm.lvs vg_name with
