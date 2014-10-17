@@ -1,5 +1,4 @@
-COMMANDS=Plugin.Query Plugin.diagnostics SR.create SR.ls SR.destroy SR.attach SR.detach Volume.create Volume.destroy Volume.stat
-LIBRARIES=lvm.ml common.ml
+COMMANDS=Datapath.activate  Datapath.attach  Datapath.deactivate  Datapath.detach
 
 .PHONY: clean
 clean:
@@ -14,10 +13,9 @@ test:
 	done
 
 DESTDIR?=/
-SCRIPTDIR?=/usr/lib/xapi-storage-script/volume/org.xen.xcp.storage.ezlvm
+SCRIPTDIR?=/usr/lib/xapi-storage-script/datapath/block
 
 .PHONY: install
 install:
 	mkdir -p $(DESTDIR)$(SCRIPTDIR)
 	install -m 0755 $(COMMANDS) $(DESTDIR)$(SCRIPTDIR)
-	install -m 0644 $(LIBRARIES) $(DESTDIR)$(SCRIPTDIR)
