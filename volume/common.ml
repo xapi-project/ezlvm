@@ -185,17 +185,17 @@ let run ?(env= [| |]) ?stdin cmd args =
     let stdin_readable, stdin_writable = Unix.pipe () in
     to_close := stdin_readable :: stdin_writable :: !to_close;
     (* stdout buffers to a temp file *)
-    let stdout_filename = Filename.temp_file Sys.argv.(0) "stdout" in
+    let stdout_filename = Filename.temp_file (Filename.basename Sys.argv.(0)) "stdout" in
     let stdout_readable = Unix.openfile stdout_filename [ Unix.O_RDONLY; Unix.O_CREAT; Unix.O_CLOEXEC ] 0o0600 in
     let stdout_writable = Unix.openfile stdout_filename [ Unix.O_WRONLY ] 0o0600 in
     to_close := stdout_readable :: stdout_writable :: !to_close;
-    (* Unix.unlink stdout_filename; *)
+    Unix.unlink stdout_filename;
     (* stderr buffers to a temp file *)
-    let stderr_filename = Filename.temp_file Sys.argv.(0) "stderr" in
+    let stderr_filename = Filename.temp_file (Filename.basename Sys.argv.(0)) "stderr" in
     let stderr_readable = Unix.openfile stderr_filename [ Unix.O_RDONLY; Unix.O_CREAT; Unix.O_CLOEXEC ] 0o0600 in
     let stderr_writable = Unix.openfile stderr_filename [ Unix.O_WRONLY ] 0o0600 in
     to_close := stderr_readable :: stderr_writable :: !to_close;
-    (*Unix.unlink stderr_filename;*)
+    Unix.unlink stderr_filename;
 
     let pid = Unix.create_process_env cmd (Array.of_list (cmd :: args)) env stdin_readable stdout_writable stderr_writable in
     close stdin_readable;
