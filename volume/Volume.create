@@ -25,7 +25,7 @@ module Command = struct
   let command common { Volume.Create.In.dbg; sr; name; description; size } =
     (* LVM refuses to create a disk with 0 extents *)
     let size = max size 1L in
-    Lvm.lvcreate sr name size;
+    let name = Lvm.lvcreate sr name size in
     {
       key = name;
       name = name;
@@ -45,15 +45,34 @@ module Test = struct
     finally
       (fun () ->
         Lvm.vgcreate vg_name [ vol ];
-        Lvm.lvcreate vg_name "testvol" 1L;
-        Lvm.lvremove vg_name "testvol"
+        let a = Lvm.lvcreate vg_name "testvol" 1L in
+        Lvm.lvremove vg_name a
       ) (fun () ->
+        Lvm.vgremove vg_name;
         Lvm.remove_temp_volume vol
       )
+
+  let test_name_duplication () =
+    let vol = Lvm.make_temp_volume () in
+    let vg_name = "hello" in
+    finally
+      (fun () ->
+        Lvm.vgcreate vg_name [ vol ];
+        let a = Lvm.lvcreate vg_name "testvol" 1L in
+        let b = Lvm.lvcreate vg_name "testvol" 1L in
+        if a = b then failwith "created volumes with identical names";
+        Lvm.lvremove vg_name a;
+        Lvm.lvremove vg_name b
+     ) (fun () ->
+        Lvm.vgremove vg_name;
+        Lvm.remove_temp_volume vol
+     )
+
 
   let test common =
     let suite = "create" >::: [
       "lvcreate" >:: test_lvcreate;
+      "lvcreate with identical names" >:: test_name_duplication;
     ] in
     ignore(run_test_tt ~verbose:common.Common.verbose suite)
 end
