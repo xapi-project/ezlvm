@@ -1,4 +1,4 @@
-SUBDIRS=volume
+SUBDIRS=volume datapath
 
 .PHONY: clean
 clean:
@@ -10,4 +10,10 @@ clean:
 test:
 	for dir in $(SUBDIRS); do \
           $(MAKE) -C $$dir test; \
+        done
+
+.PHONY: install
+install:
+	for dir in $(SUBDIRS); do \
+          $(MAKE) -C $$dir install; \
         done

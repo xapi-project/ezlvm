@@ -10,26 +10,23 @@ by using human-readable names for everything.
 Roadmap
 -------
 
-This adapter will have the following features in v1:
+This adapter will have the following features in v1: (an [x] means the
+feature is already implemented)
 
-1. Ezlvm interoperates with existing volume groups, as well as those it
-   creates itself.
+- [ ] Ezlvm interoperates with existing volume groups, as well as those it
+      creates itself.
 
-2. Ezlvm exposes devices raw so they can be accessed via blkback. This
-   ensures a very low-latency datapath which is important for fast local
-   devices (e.g. SSDs, PCIe flash)
+- [x] Ezlvm exposes devices raw so they can be accessed via blkback. This
+      ensures a very low-latency datapath which is important for fast local
+      devices (e.g. SSDs, PCIe flash)
 
-3. Ezlvm volumes use human-readable, sysadmin-friendly, names rather than
-   obscure UUIDs
+- [x] Ezlvm volumes use human-readable, sysadmin-friendly, names rather than
+      obscure UUIDs
 
-4. Ezlvm uses LVM thin provisioning by default for fast volume creation
-   and efficient use of space.
+- [ ] Ezlvm uses LVM thin provisioning by default for fast volume creation
+      and efficient use of space.
 
-5. Ezlvm uses [ocamlscript](http://mjambon.com/ocamlscript.html) to combine
-   the fast edit-run cycle of scripts with the static analysis provided
-   via the OCaml typechecker.
+- [x] Ezlvm uses [ocamlscript](http://mjambon.com/ocamlscript.html) to combine
+      the fast edit-run cycle of scripts with the static analysis provided
+      via the OCaml typechecker.
 
-This adarter will have the following features in v2:
-
-1. Ezlvm supports snapshots from .qcow2/.vhd/.vmdk files stored on
-   remote servers.

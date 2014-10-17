@@ -1,0 +1,4 @@
+0.1 (17-Oct-2014)
+* initial LVM support
+* LVs use human-readable names
+* block devices are attached via blkback
