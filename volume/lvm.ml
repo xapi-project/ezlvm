@@ -14,6 +14,10 @@
 
 open Common
 
+let newline = Re_str.regexp_string "\n"
+let whitespace = Re_str.regexp "[\n\r\t ]+"
+let comma = Re_str.regexp_string ","
+
 (* The rules for LV names from 'man lvm': *)
 let legal_lv_char = function
 | 'a'..'z' | 'A' .. 'Z' | '0' .. '9' | '+' | '_' | '.' | '-' -> true
@@ -40,6 +44,31 @@ let mangle_lv_name x : string =
     loop result illegal_lv_substrings
   end
 
+(* Parse the result of 'command --units b' *)
+let parse_B x =
+  let x' = String.length x in
+  try
+    assert (x.[x'-1] = 'B');
+    let without_b = String.sub x 0 (x' - 1) in
+    Int64.of_string without_b
+  with _ ->
+    failwith (Printf.sprintf "Couldn't parse size in B: '%s' (expected [\\d]+B)" x)
+
+(* Parse the result of 'command --units m' *)
+let parse_MiB x =
+  let x' = String.length x in
+  try
+    assert (x.[x'-1] = 'm');
+    let without_m = String.sub x 0 (x' - 1) in
+    let before_dot =
+      try
+        let dot = String.index without_m '.' in
+        String.sub without_m 0 dot
+      with _ -> without_m in
+    Int64.of_string before_dot
+  with _ ->
+    failwith (Printf.sprintf "Couldn't parse size in MiB: '%s' (expected [\\d]+m)" x)
+
 let make_temp_volume () =
   let path = Filename.temp_file Sys.argv.(0) "volume" in
   ignore_string (Common.run "dd" [ "if=/dev/zero"; "of=" ^ path; "seek=1024"; "bs=1M"; "count=1"]);
@@ -60,6 +89,21 @@ let make_temp_volume () =
 let remove_temp_volume volume =
   ignore_string (Common.run "losetup" [ "-d"; volume ])
 
+let free_space_in_vg vg =
+  Common.run "vgs" ["--noheadings"; "-o"; "vg_size"; vg; "--units"; "m"] 
+  |> Re_str.split_delim whitespace
+  |> List.filter (fun x -> x <> "")
+  |> List.hd
+  |> parse_MiB
+
+let thin_pool_name = "ezlvm_thin_pool"
+
+let thin_pool_create vg_name =
+  let free_space = free_space_in_vg vg_name in
+  (* let's arbitrarily use 80% of the free space for thin provisioning *)
+  let size_mb = Int64.(to_string (mul (div free_space 5L) 4L)) in
+  ignore_string (Common.run "lvcreate" [ "-L"; size_mb; "--thinpool"; thin_pool_name; vg_name ]) 
+
 let vgcreate vg_name = function
   | [] -> failwith "I need at least 1 physical device to create a volume group"
   | d :: ds as devices ->
@@ -73,19 +117,17 @@ let vgcreate vg_name = function
     (* Create the VG on the first device *)
     ignore_string (run "vgcreate" [ vg_name; d ]);
     List.iter (fun dev -> ignore_string (run "vgextend" [ vg_name; dev ])) ds;
-    ignore_string (run "vgchange" [ "-an"; vg_name ])
+    ignore_string (run "vgchange" [ "-an"; vg_name ]);
+    thin_pool_create vg_name
 
 let vgremove vg_name =
+  ignore_string (run "lvremove" [ "-f"; vg_name ^ "/" ^ thin_pool_name ]);
   ignore_string(run "vgremove" [ "-f"; vg_name ])
 
 type lv = {
   name: string;
   size: int64;
 }
-
-let newline = Re_str.regexp_string "\n"
-let whitespace = Re_str.regexp "[\n\r\t ]+"
-let comma = Re_str.regexp_string ","
 
 let to_lines output = List.filter (fun x -> x <> "") (Re_str.split_delim newline output)
 
@@ -96,7 +138,7 @@ let lvs vg_name =
     (fun line ->
       match List.filter (fun x -> x <> "") (Re_str.split_delim whitespace line) with
       | [ x; y ] ->
-        let size = Int64.of_string (String.sub y 0 (String.length y - 1)) in
+        let size = parse_B y in
         { name = x; size }
       | _ ->
         debug "Couldn't parse the LV name/ size: [%s]" line;
@@ -113,14 +155,19 @@ let find r string =
   with Not_found ->
     false
 
-let lvcreate vg_name lv_name bytes =
-  let size_mb = Int64.to_string (Int64.div (Int64.add 1048575L bytes) (1048576L)) in
+let lvcreate vg_name lv_name kind =
+  let args = match kind with
+  | `New bytes ->
+    let size_mb = Int64.to_string (Int64.div (Int64.add 1048575L bytes) (1048576L)) in
+    [ "-V"; size_mb ^ "m"; "-T"; vg_name ^ "/" ^ thin_pool_name; "-n" ]
+  | `Snapshot name ->
+    [ "-s"; vg_name ^ "/" ^ lv_name; "-n" ] in
   let lv_name = mangle_lv_name lv_name in
   let lv_name' = String.length lv_name in
   let rec retry attempts_remaining suffix =
     try
       let lv_name = if suffix = 0 then lv_name else lv_name ^ (string_of_int suffix) in
-      ignore_string (Common.run "lvcreate" [ "-L"; size_mb; "-n"; lv_name; vg_name; "-Z"; "n" ]);
+      ignore_string (Common.run "lvcreate" (args @ [ lv_name ]));
       lv_name
     with Common.Bad_exit(5, _, _, stdout, stderr) as e->
       if find volume_already_exists stderr then begin

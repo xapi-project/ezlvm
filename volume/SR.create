@@ -27,6 +27,7 @@ module Command = struct
     let vgs = Lvm.vgs () in
     if not(List.mem vg vgs)
     then raise (Storage.V.SR_does_not_exist vg);
+    Lvm.thin_pool_create vg;
     ()
 end
 
