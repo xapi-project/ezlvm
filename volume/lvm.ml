@@ -155,14 +155,19 @@ let find r string =
   with Not_found ->
     false
 
-let lvcreate vg_name lv_name bytes =
-  let size_mb = Int64.to_string (Int64.div (Int64.add 1048575L bytes) (1048576L)) in
+let lvcreate vg_name lv_name kind =
+  let args = match kind with
+  | `New bytes ->
+    let size_mb = Int64.to_string (Int64.div (Int64.add 1048575L bytes) (1048576L)) in
+    [ "-V"; size_mb ^ "m"; "-T"; vg_name ^ "/" ^ thin_pool_name; "-n" ]
+  | `Snapshot name ->
+    [ "-s"; vg_name ^ "/" ^ lv_name; "-n" ] in
   let lv_name = mangle_lv_name lv_name in
   let lv_name' = String.length lv_name in
   let rec retry attempts_remaining suffix =
     try
       let lv_name = if suffix = 0 then lv_name else lv_name ^ (string_of_int suffix) in
-      ignore_string (Common.run "lvcreate" [ "-V"; size_mb ^ "m"; "-n"; lv_name; "-T"; vg_name ^ "/" ^ thin_pool_name ]);
+      ignore_string (Common.run "lvcreate" (args @ [ lv_name ]));
       lv_name
     with Common.Bad_exit(5, _, _, stdout, stderr) as e->
       if find volume_already_exists stderr then begin
@@ -176,7 +181,6 @@ let lvcreate vg_name lv_name bytes =
         retry (attempts_remaining - 1) (largest_suffix + 1)
       end else raise e in
   retry 5 0
-
 
 let lvremove vg_name lv_name =
   ignore_string(Common.run "lvremove" [ "-f"; Printf.sprintf "%s/%s" vg_name lv_name])

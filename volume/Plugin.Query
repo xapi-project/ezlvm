@@ -30,7 +30,7 @@ module Command = struct
     copyright = "(C) 2014 Citrix Inc";
     version = "0.1";
     required_api_version = "0.1";
-    features = [ "SR_ATTACH"; "SR_DETACH"; "SR_CREATE"; "VDI_CREATE"; "VDI_DESTROY"; "VDI_ATTACH"; "VDI_DETACH"; "VDI_ACTIVATE"; "VDI_DEACTIVATE"];
+    features = [ "SR_ATTACH"; "SR_DETACH"; "SR_CREATE"; "VDI_CREATE"; "VDI_DESTROY"; "VDI_CLONE"; "VDI_SNAPSHOT"; "VDI_ATTACH"; "VDI_DETACH"; "VDI_ACTIVATE"; "VDI_DEACTIVATE"];
     configuration = []
   }
 end

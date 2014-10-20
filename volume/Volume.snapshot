@@ -20,59 +20,41 @@ open Common
 
 module Command = struct
   open Storage.V.Types
-  include Volume.Create
+  include Volume.Snapshot
 
-  let command common { Volume.Create.In.dbg; sr; name; description; size } =
-    (* LVM refuses to create a disk with 0 extents *)
-    let size = max size 1L in
-    let name = Lvm.lvcreate sr name (`New size) in
+  let command common { Volume.Snapshot.In.dbg; sr; key } =
+    let lv = Lvm.lvcreate sr key (`Snapshot key) in
     {
-      key = name;
-      name = name;
-      description = description;
+      key = lv;
+      name = lv;
+      description = "Snapshot of " ^ key;
       read_write = true;
-      uri = ["block://" ^ (Lvm.path_of sr name) ];
-      virtual_size = size;
+      uri = ["block://" ^ (Lvm.path_of sr lv) ];
+      virtual_size = 0L;
     }
 end
 
 module Test = struct
   open OUnit
 
-  let test_lvcreate () =
+  let test_snapshot () =
     let vol = Lvm.make_temp_volume () in
     let vg_name = "hello" in
     finally
       (fun () ->
         Lvm.vgcreate vg_name [ vol ];
         let a = Lvm.lvcreate vg_name "testvol" (`New 1L) in
+        let b = Lvm.lvcreate vg_name a (`Snapshot a) in
+        Lvm.lvremove b;
         Lvm.lvremove vg_name a
       ) (fun () ->
         Lvm.vgremove vg_name;
         Lvm.remove_temp_volume vol
       )
 
-  let test_name_duplication () =
-    let vol = Lvm.make_temp_volume () in
-    let vg_name = "hello" in
-    finally
-      (fun () ->
-        Lvm.vgcreate vg_name [ vol ];
-        let a = Lvm.lvcreate vg_name "testvol" (`New 1L) in
-        let b = Lvm.lvcreate vg_name "testvol" (`New 1L) in
-        if a = b then failwith "created volumes with identical names";
-        Lvm.lvremove vg_name a;
-        Lvm.lvremove vg_name b
-     ) (fun () ->
-        Lvm.vgremove vg_name;
-        Lvm.remove_temp_volume vol
-     )
-
-
   let test common =
-    let suite = "create" >::: [
-      "lvcreate" >:: test_lvcreate;
-      "lvcreate with identical names" >:: test_name_duplication;
+    let suite = "snapshot" >::: [
+      "snapshot" >:: test_snapshot;
     ] in
     ignore(run_test_tt ~verbose:common.Common.verbose suite)
 end
