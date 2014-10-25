@@ -24,7 +24,10 @@ if __name__ == "__main__":
         print "Not implemented"
         sys.exit(1)
 
-    dispatcher = xapi.d.Datapath_server_dispatcher(Implementation())
-    request = json.loads(sys.stdin.readline(),)
-    results = dispatcher.attach(request)
-    print json.dumps(results)
+    try:
+        dispatcher = xapi.d.Datapath_server_dispatcher(Implementation())
+        request = json.loads(sys.stdin.readline(),)
+        results = dispatcher.attach(request)
+        print json.dumps(results)
+    except Exception, e:
+        handle_exception(e)
