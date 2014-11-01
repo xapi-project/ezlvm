@@ -45,7 +45,7 @@ module Test = struct
         Lvm.vgcreate vg_name [ vol ];
         let a = Lvm.lvcreate vg_name "testvol" (`New 1L) in
         let b = Lvm.lvcreate vg_name a (`Snapshot a) in
-        Lvm.lvremove b;
+        Lvm.lvremove vg_name b;
         Lvm.lvremove vg_name a
       ) (fun () ->
         Lvm.vgremove vg_name;
