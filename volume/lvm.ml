@@ -14,6 +14,11 @@
 
 open Common
 
+(* Ensure the metadata may be updated: *)
+let metadata_write_is_ok = [
+  "--config"; "global {metadata_read_only=0}"
+]
+
 let newline = Re_str.regexp_string "\n"
 let whitespace = Re_str.regexp "[\n\r\t ]+"
 let comma = Re_str.regexp_string ","
@@ -102,7 +107,7 @@ let thin_pool_create vg_name =
   let free_space = free_space_in_vg vg_name in
   (* let's arbitrarily use 80% of the free space for thin provisioning *)
   let size_mb = Int64.(to_string (mul (div free_space 5L) 4L)) in
-  ignore_string (Common.run "lvcreate" [ "-L"; size_mb; "--thinpool"; thin_pool_name; vg_name ]) 
+  ignore_string (Common.run "lvcreate" (metadata_write_is_ok @ [ "-L"; size_mb; "--thinpool"; thin_pool_name; vg_name ]))
 
 let vgcreate vg_name = function
   | [] -> failwith "I need at least 1 physical device to create a volume group"
@@ -111,18 +116,18 @@ let vgcreate vg_name = function
       (fun dev ->
         (* First destroy anything already on the device *)
         ignore_string (run "dd" [ "if=/dev/zero"; "of=" ^ dev; "bs=512"; "count=4" ]);
-        ignore_string (run "pvcreate" [ "--metadatasize"; "10M"; dev ])
+        ignore_string (run "pvcreate" (metadata_write_is_ok @ [ "--metadatasize"; "10M"; dev ]))
       ) devices;
 
     (* Create the VG on the first device *)
-    ignore_string (run "vgcreate" [ vg_name; d ]);
-    List.iter (fun dev -> ignore_string (run "vgextend" [ vg_name; dev ])) ds;
+    ignore_string (run "vgcreate" (metadata_write_is_ok @ [ vg_name; d ]));
+    List.iter (fun dev -> ignore_string (run "vgextend" (metadata_write_is_ok @ [vg_name; dev ]))) ds;
     ignore_string (run "vgchange" [ "-an"; vg_name ]);
     thin_pool_create vg_name
 
 let vgremove vg_name =
-  ignore_string (run "lvremove" [ "-f"; vg_name ^ "/" ^ thin_pool_name ]);
-  ignore_string(run "vgremove" [ "-f"; vg_name ])
+  ignore_string (run "lvremove" (metadata_write_is_ok @ [ "-f"; vg_name ^ "/" ^ thin_pool_name ]));
+  ignore_string(run "vgremove"  (metadata_write_is_ok @ [ "-f"; vg_name ]))
 
 type lv = {
   name: string;
@@ -167,7 +172,7 @@ let lvcreate vg_name lv_name kind =
   let rec retry attempts_remaining suffix =
     try
       let lv_name = if suffix = 0 then lv_name else lv_name ^ (string_of_int suffix) in
-      ignore_string (Common.run "lvcreate" (args @ [ lv_name ]));
+      ignore_string (Common.run "lvcreate" (metadata_write_is_ok @ args @ [ lv_name ]));
       lv_name
     with Common.Bad_exit(5, _, _, stdout, stderr) as e->
       if find volume_already_exists stderr then begin
@@ -183,7 +188,7 @@ let lvcreate vg_name lv_name kind =
   retry 5 0
 
 let lvremove vg_name lv_name =
-  ignore_string(Common.run "lvremove" [ "-f"; Printf.sprintf "%s/%s" vg_name lv_name])
+  ignore_string(Common.run "lvremove" (metadata_write_is_ok @ [ "-f"; Printf.sprintf "%s/%s" vg_name lv_name]))
 
 let device vg_name lv_name = Printf.sprintf "/dev/%s/%s" vg_name lv_name
 
@@ -206,7 +211,7 @@ let lvresize vg_name lv_name size =
   let size_mb_rounded = Int64.mul 4L (Int64.div (Int64.add size_mb 3L) 4L) in
   if cur_mb <> size_mb_rounded then begin
     debug "lvresize: current size is %Ld MiB <> requested size %Ld MiB (rounded from %Ld); resizing" cur_mb size_mb_rounded size_mb;
-    ignore_string(Common.run ~stdin:"y\n" "lvresize" [ vg_name ^ "/" ^ lv_name; "-L"; Int64.to_string size_mb ])
+    ignore_string(Common.run ~stdin:"y\n" "lvresize" (metadata_write_is_ok @ [ vg_name ^ "/" ^ lv_name; "-L"; Int64.to_string size_mb ]))
   end
 
 let vgs () =
