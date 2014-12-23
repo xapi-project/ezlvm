@@ -90,7 +90,7 @@ let remove_temp_volume volume =
   ignore_string (Common.run "losetup" [ "-d"; volume ])
 
 let free_space_in_vg vg =
-  Common.run "vgs" ["--noheadings"; "-o"; "vg_size"; vg; "--units"; "m"] 
+  Common.run "vgs" ["--noheadings"; "-o"; "vg_free"; vg; "--units"; "m"] 
   |> Re_str.split_delim whitespace
   |> List.filter (fun x -> x <> "")
   |> List.hd
