@@ -101,34 +101,6 @@ let free_space_in_vg vg =
   |> List.hd
   |> parse_MiB
 
-let thin_pool_name = "ezlvm_thin_pool"
-
-let thin_pool_create vg_name =
-  let free_space = free_space_in_vg vg_name in
-  (* let's arbitrarily use 80% of the free space for thin provisioning *)
-  let size_mb = Int64.(to_string (mul (div free_space 5L) 4L)) in
-  ignore_string (Common.run "lvcreate" (metadata_write_is_ok @ [ "-L"; size_mb; "--thinpool"; thin_pool_name; vg_name ]))
-
-let vgcreate vg_name = function
-  | [] -> failwith "I need at least 1 physical device to create a volume group"
-  | d :: ds as devices ->
-    List.iter
-      (fun dev ->
-        (* First destroy anything already on the device *)
-        ignore_string (run "dd" [ "if=/dev/zero"; "of=" ^ dev; "bs=512"; "count=4" ]);
-        ignore_string (run "pvcreate" (metadata_write_is_ok @ [ "--metadatasize"; "10M"; dev ]))
-      ) devices;
-
-    (* Create the VG on the first device *)
-    ignore_string (run "vgcreate" (metadata_write_is_ok @ [ vg_name; d ]));
-    List.iter (fun dev -> ignore_string (run "vgextend" (metadata_write_is_ok @ [vg_name; dev ]))) ds;
-    ignore_string (run "vgchange" [ "-an"; vg_name ]);
-    thin_pool_create vg_name
-
-let vgremove vg_name =
-  ignore_string (run "lvremove" (metadata_write_is_ok @ [ "-f"; vg_name ^ "/" ^ thin_pool_name ]));
-  ignore_string(run "vgremove"  (metadata_write_is_ok @ [ "-f"; vg_name ]))
-
 type lv = {
   name: string;
   size: int64;
@@ -149,6 +121,40 @@ let lvs vg_name =
         debug "Couldn't parse the LV name/ size: [%s]" line;
         failwith (Printf.sprintf "Couldn't parse the LV name/ size: [%s]" line)
     )
+
+let thin_pool_name = "ezlvm_thin_pool"
+
+let thin_pool_create vg_name =
+  let free_space = free_space_in_vg vg_name in
+  (* let's arbitrarily use 80% of the free space for thin provisioning *)
+  let size_mb = Int64.(to_string (mul (div free_space 5L) 4L)) in
+  (* check the volume doesn't already work *)
+  let all = lvs vg_name in
+  try
+    let _ = List.find (fun x -> x.name = thin_pool_name) all in
+    debug "Thin pool %s already exists, we'll use it" thin_pool_name
+  with _ ->
+    ignore_string (Common.run "lvcreate" (metadata_write_is_ok @ [ "-L"; size_mb; "--thinpool"; thin_pool_name; vg_name ]))
+
+let vgcreate vg_name = function
+  | [] -> failwith "I need at least 1 physical device to create a volume group"
+  | d :: ds as devices ->
+    List.iter
+      (fun dev ->
+        (* First destroy anything already on the device *)
+        ignore_string (run "dd" [ "if=/dev/zero"; "of=" ^ dev; "bs=512"; "count=4" ]);
+        ignore_string (run "pvcreate" (metadata_write_is_ok @ [ "--metadatasize"; "10M"; dev ]))
+      ) devices;
+
+    (* Create the VG on the first device *)
+    ignore_string (run "vgcreate" (metadata_write_is_ok @ [ vg_name; d ]));
+    List.iter (fun dev -> ignore_string (run "vgextend" (metadata_write_is_ok @ [vg_name; dev ]))) ds;
+    ignore_string (run "vgchange" [ "-an"; vg_name ]);
+    thin_pool_create vg_name
+
+let vgremove vg_name =
+  ignore_string (run "lvremove" (metadata_write_is_ok @ [ "-f"; vg_name ^ "/" ^ thin_pool_name ]));
+  ignore_string(run "vgremove"  (metadata_write_is_ok @ [ "-f"; vg_name ]))
 
 (* If a volume already exists then we see this on stderr:
    'Logical volume "testvol" already exists in volume group' *)
