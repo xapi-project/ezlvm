@@ -19,18 +19,21 @@ Ocaml.ocamlflags := ["-thread"]
 open Common
 
 module Command = struct
-  open Storage.V.Types
+  open Storage.Volume.Types
   include Volume.Clone
 
   let command common { Volume.Clone.In.dbg; sr; key } =
     let lv = Lvm.lvcreate sr key (`Snapshot key) in
     {
       key = lv;
+      uuid = None;
       name = lv;
       description = "Clone of " ^ key;
       read_write = true;
       uri = ["block://" ^ (Lvm.path_of sr lv) ];
       virtual_size = 0L;
+      physical_utilisation = 0L;
+      keys = [];
     }
 end
 
