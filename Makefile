@@ -10,7 +10,7 @@ test:
 	# Running the commands will invoke the typechecker
 	for command in $(COMMANDS); do \
 	        echo $$command ; \
-		(cd src/./$$command --test) ; \
+		(cd src/; ./$$command --test) ; \
 	done
 
 DESTDIR?=/
