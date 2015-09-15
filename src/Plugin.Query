@@ -23,7 +23,7 @@ module Command = struct
   include Plugin.Query
 
   let command common { Plugin.Query.In.dbg } = {
-    plugin = "plainlvm";
+    plugin = "ezlvm";
     name = "Plain LVM Volume plugin";
     description = "This plugin uses an existing LVM volume group and represents Volumes as LVs";
     vendor = "None";
