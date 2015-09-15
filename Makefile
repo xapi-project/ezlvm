@@ -1,4 +1,4 @@
-COMMANDS=Plugin.Query Plugin.diagnostics SR.create SR.ls SR.destroy SR.attach SR.stat SR.detach Volume.create Volume.destroy Volume.stat Volume.snapshot Volume.clone Volume.set_name Volume.set_description
+COMMANDS=Plugin.Query Plugin.diagnostics SR.create SR.set_name SR.set_description SR.ls SR.destroy SR.attach SR.stat SR.detach Volume.create Volume.destroy Volume.stat Volume.snapshot Volume.clone Volume.set_name Volume.set_description
 LIBRARIES=lvm.ml common.ml
 
 .PHONY: clean
