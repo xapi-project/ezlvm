@@ -1,19 +1,23 @@
-SUBDIRS=volume datapath
+COMMANDS=Plugin.Query Plugin.diagnostics SR.create SR.ls SR.destroy SR.attach SR.stat SR.detach Volume.create Volume.destroy Volume.stat Volume.snapshot Volume.clone
+LIBRARIES=lvm.ml common.ml
 
 .PHONY: clean
 clean:
-	for dir in $(SUBDIRS); do \
-          $(MAKE) -C $$dir clean; \
-        done
+	rm -f *.exe
 
 .PHONY: test
 test:
-	for dir in $(SUBDIRS); do \
-          $(MAKE) -C $$dir test; \
-        done
+	# Running the commands will invoke the typechecker
+	for command in $(COMMANDS); do \
+	        echo $$command ; \
+		(cd src/./$$command --test) ; \
+	done
+
+DESTDIR?=/
+SCRIPTDIR?=/usr/libexec/xapi-storage-script
 
 .PHONY: install
 install:
-	for dir in $(SUBDIRS); do \
-          $(MAKE) -C $$dir install; \
-        done
+	mkdir -p $(DESTDIR)$(SCRIPTDIR)/volume/org.xen.xapi.storage.ezlvm
+	(cd src; install -m 0755 $(COMMANDS) $(DESTDIR)$(SCRIPTDIR)/volume/org.xen.xapi.storage.ezlvm)
+	(cd src; install -m 0644 $(LIBRARIES) $(DESTDIR)$(SCRIPTDIR)/volume/org.xen.xapi.storage.ezlvm)

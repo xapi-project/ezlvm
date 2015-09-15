@@ -101,6 +101,13 @@ let free_space_in_vg vg =
   |> List.hd
   |> parse_MiB
 
+let total_space_in_vg vg =
+  Common.run "vgs" ["--noheadings"; "-o"; "vg_size"; vg; "--units"; "m"] 
+  |> Re_str.split_delim whitespace
+  |> List.filter (fun x -> x <> "")
+  |> List.hd
+  |> parse_MiB
+
 type lv = {
   name: string;
   size: int64;
