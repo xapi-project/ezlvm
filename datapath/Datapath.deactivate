@@ -3,11 +3,11 @@
 import sys
 
 import xapi
-import xapi.d
+import xapi.storage.api.datapath
 
 import argparse, json
 
-class Implementation(xapi.d.Datapath_skeleton):
+class Implementation(xapi.storage.api.datapath.Datapath_skeleton):
     def deactivate(self, dbg, uri, domain):
         return
 
@@ -21,7 +21,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     try:
-        dispatcher = xapi.d.Datapath_server_dispatcher(Implementation())
+        dispatcher = xapi.storage.api.datapath.Datapath_server_dispatcher(Implementation())
         request = json.loads(sys.stdin.readline(),)
         results = dispatcher.deactivate(request)
         print json.dumps(results)
