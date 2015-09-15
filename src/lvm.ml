@@ -179,7 +179,7 @@ let lvcreate vg_name lv_name kind =
     let size_mb = Int64.to_string (Int64.div (Int64.add 1048575L bytes) (1048576L)) in
     [ "-V"; size_mb ^ "m"; "-T"; vg_name ^ "/" ^ thin_pool_name; "-n" ]
   | `Snapshot name ->
-    [ "-s"; vg_name ^ "/" ^ lv_name; "-n" ] in
+    [ "-k"; "n"; "-s"; vg_name ^ "/" ^ lv_name; "-n" ] in
   let lv_name = mangle_lv_name lv_name in
   let lv_name' = String.length lv_name in
   let rec retry attempts_remaining suffix =
