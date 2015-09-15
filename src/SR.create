@@ -18,6 +18,9 @@ Ocaml.ocamlflags := ["-thread"]
  *)
 open Common
 
+let _ =
+  List.iter (fun x -> Printf.fprintf stderr "found [%s]\n" x) (Lvm.vgs())
+
 module Command = struct
   open Storage.Volume.Types
   include SR.Create
