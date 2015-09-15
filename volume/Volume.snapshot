@@ -19,18 +19,21 @@ Ocaml.ocamlflags := ["-thread"]
 open Common
 
 module Command = struct
-  open Storage.V.Types
+  open Storage.Volume.Types
   include Volume.Snapshot
 
   let command common { Volume.Snapshot.In.dbg; sr; key } =
     let lv = Lvm.lvcreate sr key (`Snapshot key) in
     {
       key = lv;
+      uuid = None;
       name = lv;
       description = "Snapshot of " ^ key;
       read_write = true;
       uri = ["block://" ^ (Lvm.path_of sr lv) ];
       virtual_size = 0L;
+      physical_utilisation = 0L;
+      keys = [];
     }
 end
 
@@ -45,7 +48,7 @@ module Test = struct
         Lvm.vgcreate vg_name [ vol ];
         let a = Lvm.lvcreate vg_name "testvol" (`New 1L) in
         let b = Lvm.lvcreate vg_name a (`Snapshot a) in
-        Lvm.lvremove b;
+        Lvm.lvremove vg_name b;
         Lvm.lvremove vg_name a
       ) (fun () ->
         Lvm.vgremove vg_name;

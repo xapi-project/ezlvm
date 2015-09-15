@@ -19,7 +19,7 @@ Ocaml.ocamlflags := ["-thread"]
 open Common
 
 module Command = struct
-  open Storage.V.Types
+  open Storage.Volume.Types
   include Volume.Create
 
   let command common { Volume.Create.In.dbg; sr; name; description; size } =
@@ -28,11 +28,14 @@ module Command = struct
     let name = Lvm.lvcreate sr name (`New size) in
     {
       key = name;
+      uuid = None;
       name = name;
       description = description;
       read_write = true;
       uri = ["block://" ^ (Lvm.path_of sr name) ];
       virtual_size = size;
+      physical_utilisation = size;
+      keys = [];
     }
 end
 

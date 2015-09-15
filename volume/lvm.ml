@@ -235,11 +235,14 @@ let path_of vg lv =
   "/dev/mapper/" ^ (String.concat "--" vg') ^ "-" ^ (String.concat "--" lv')
 
 let volume_of_lv sr lv = {
-  Storage.V.Types.key = lv.name;
+  Storage.Volume.Types.key = lv.name;
+  uuid = None;
   name = lv.name;
   description = "";
   read_write = true;
   uri = ["block://" ^ (path_of sr lv.name) ];
   virtual_size = lv.size;
+  physical_utilisation = lv.size;
+  keys = [];
 }
 

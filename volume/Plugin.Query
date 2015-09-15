@@ -19,7 +19,7 @@ Ocaml.ocamlflags := ["-thread"]
 open Common
 
 module Command = struct
-  open Storage.P.Types
+  open Storage.Plugin.Types
   include Plugin.Query
 
   let command common { Plugin.Query.In.dbg } = {
@@ -31,7 +31,8 @@ module Command = struct
     version = "0.1";
     required_api_version = "0.1";
     features = [ "SR_ATTACH"; "SR_DETACH"; "SR_CREATE"; "VDI_CREATE"; "VDI_DESTROY"; "VDI_CLONE"; "VDI_SNAPSHOT"; "VDI_ATTACH"; "VDI_DETACH"; "VDI_ACTIVATE"; "VDI_DEACTIVATE"];
-    configuration = []
+    configuration = [];
+    required_cluster_stack = [];
   }
 end
 
