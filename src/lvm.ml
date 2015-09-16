@@ -28,7 +28,7 @@ let legal_lv_char = function
 | 'a'..'z' | 'A' .. 'Z' | '0' .. '9' | '+' | '_' | '.' | '-' -> true
 | _ -> false
 
-let illegal_lv_names = [ "."; ".."; "snapshot"; "pvmove" ]
+let illegal_lv_names = [ ""; "."; ".."; "snapshot"; "pvmove" ]
 let illegal_lv_substrings =
   List.map Re_str.regexp_string
   [ "_mlog"; "_mimage"; "_rimage"; "_tdata"; "_tmeta" ]
